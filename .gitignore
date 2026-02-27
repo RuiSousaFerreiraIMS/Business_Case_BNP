@@ -1,0 +1,15 @@
+# Data files
+
+/src/data/raw/bdoss.parquet
+/src/data/raw/crc.parquet
+/src/data/raw/credscore.parquet
+/src/data/raw/fama.parquet
+
+/src/data/converted/bdoss.csv
+/src/data/converted/crc.csv
+/src/data/converted/credscore.csv
+/src/data/converted/fama.csv
+
+
+# Python
+__pycache__/
