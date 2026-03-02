@@ -28,7 +28,7 @@ def data_understanding_summary(df, dataset_name="Dataset"):
 
     summary_text = f"""
 ============================================================
-DATA UNDERSTANDING SUMMARY — {dataset_name}
+DATA UNDERSTANDING SUMMARY - {dataset_name}
 ============================================================
 
 Structure
@@ -158,7 +158,7 @@ def visualize_by_variable(df, max_cat=10, dataset_name="Dataset"):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# DATA PREPARATION HELPERS
+# DATA PREPARATION HELPERS (for use in 2.Data_Preparation.ipynb)
 # ─────────────────────────────────────────────────────────────────────────────
 
 # -------------- BDOSS --------------------------------------------------------
@@ -166,16 +166,17 @@ def visualize_by_variable(df, max_cat=10, dataset_name="Dataset"):
 def _encode_risk(risk_series: pd.Series) -> pd.Series:
     """
     The RISK column is a 24-character string where each character represents
-    a month in the past 24 months. Any digit != '0' signals a delinquency.
+    a month in the past 24 months, and any digit != '0' signals a delinquency.
+    
     Returns: 1 if at least one non-zero character exists, 0 otherwise.
 
-    Implementation: fully vectorized via regex — avoids slow row-by-row .apply().
+    Implementation: fully vectorized via regex - avoids slow row-by-row .apply().
     """
     # Cast to string, strip whitespace, then flag any string that contains
     # a character other than '0' (handles mixed int/str representations)
     s = risk_series.astype(str).str.strip()
-    # '0' or '0.0' (integer zero read as float) → no risk
-    # any string with a non-zero digit → risk
+    # '0' or '0.0' (integer zero read as float) -> no risk
+    # any string with a non-zero digit -> risk
     has_nonzero = s.str.contains(r'[1-9]', regex=True, na=False)
     return has_nonzero.astype(int)
 
@@ -184,8 +185,7 @@ def clean_bdoss(df: pd.DataFrame) -> pd.DataFrame:
     """
     Clean and prepare the BDOSS loan-level dataset.
 
-    Steps
-    -----
+    Steps:
     1. Parse datetime columns.
     2. Encode the RISK target variable as binary (0 / 1).
     3. Impute missing values in numeric columns.
@@ -193,22 +193,21 @@ def clean_bdoss(df: pd.DataFrame) -> pd.DataFrame:
     5. Derive time-based features (loan age, remaining months).
     6. Drop raw datetime columns and high-leakage columns.
 
-    Returns
-    -------
+    Returns:
     Cleaned DataFrame with CONTRIB and OBS_DATE retained as join keys.
     """
     df = df.copy()
 
-    # ── 1. Parse datetimes ──────────────────────────────────────────────────
+    # 1. PARSE DATETIMES
     date_cols = ["OBS_DATE", "DCREAT", "DATFIN", "D1FIN", "DPOS", "DCSP"]
     for col in date_cols:
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], errors="coerce")
 
-    # ── 2. Encode RISK ───────────────────────────────────────────────────────
+    # 2. ENCODE RISK (binary)
     df["RISK"] = _encode_risk(df["RISK"])
 
-    # ── 3. Derived time features ─────────────────────────────────────────────
+    # 3. DERIVED TIME FEATURES
     # pandas does not support timedelta64 with unit 'M' (months are ambiguous).
     # we'll use year/month arithmetic instead for an exact month count.
     if "DCREAT" in df.columns and "OBS_DATE" in df.columns:
@@ -219,7 +218,7 @@ def clean_bdoss(df: pd.DataFrame) -> pd.DataFrame:
     if "loan_age_months" in df.columns and "DURDEG" in df.columns:
         df["remaining_months"] = (df["DURDEG"] - df["loan_age_months"]).astype("Int64")
 
-    # ── 4. Numeric imputation (median) ───────────────────────────────────────
+    # 4. NUMERIC IMPUTATION (median)
     num_impute_cols = [
         "DURDEG", "RANGPRO", "RANGCLI", "MENSALIDADE_CORR",
         "RESSO", "NBENF", "BICONTRATO", "RISKA", "AGFIN", "SREC",
@@ -234,11 +233,11 @@ def clean_bdoss(df: pd.DataFrame) -> pd.DataFrame:
     if "MENSALIDADE_CORR" in df.columns and "MENSALIDADE" in df.columns:
         df["MENSALIDADE_CORR"] = df["MENSALIDADE_CORR"].fillna(df["MENSALIDADE"])
 
-    # ── 5. Categorical encoding ──────────────────────────────────────────────
+    # 5. CATEGORICAL ENCODING
     # OHE only low-cardinality columns (< ~20 unique values).
-    # PTT is a 4-digit postal code with 763 unique values — OHE would create
-    # 763 new columns × 2.6M rows ≈ OOM crash. Cast to int instead.
-    # TYPEPROD has only 1 unique value → useless, will be dropped.
+    # PTT is a 4-digit postal code with 763 unique values - OHE would create 763 new columns × 2.6M rows -> kernel crash!
+    # We will cast to int instead.
+    # TYPEPROD has only 1 unique value -> useless, will be dropped.
     if "PTT" in df.columns:
         df["PTT"] = pd.to_numeric(df["PTT"], errors="coerce").astype("Int64")
 
@@ -252,10 +251,10 @@ def clean_bdoss(df: pd.DataFrame) -> pd.DataFrame:
             df = pd.concat([df, dummies], axis=1)
             df.drop(columns=[col], inplace=True)
 
-    # ── 6. Drop raw date cols, ID cols, empty cols, and constant columns ──────
-    # TYPEPROD has 1 unique value → constant → no predictive value
+    # 6. DROP RAW DATE COLS, ID COLS, EMPTY COLS AND CONSTANT COLS
+    # TYPEPROD has 1 unique value -> constant -> no predictive value
     # DOSSIER is loan-ID, not a feature
-    # ACTIVIDADE_GLOBAL is 100% null in the source data → drop
+    # ACTIVIDADE_GLOBAL is 100% null in the source data -> drop
     drop_cols = ["DCREAT", "DATFIN", "D1FIN", "DPOS", "DCSP",
                  "DOSSIER", "ACTIVIDADE_GLOBAL"]
     df.drop(columns=[c for c in drop_cols if c in df.columns], inplace=True)
@@ -286,7 +285,7 @@ def clean_crc(df: pd.DataFrame) -> pd.DataFrame:
     if "OBS_DATE" in df.columns:
         df["OBS_DATE"] = pd.to_datetime(df["OBS_DATE"], errors="coerce")
 
-    # count and monetary cols: NaN means 'no product' → 0
+    # count and monetary cols: NaN means 'no product' -> 0
     zero_fill_cols = [c for c in df.columns
                       if c.startswith("COUNT_") or
                       c.startswith("MONTVENC_") or
@@ -313,7 +312,7 @@ def clean_crc(df: pd.DataFrame) -> pd.DataFrame:
 
 # -------------- CREDSCORE ----------------------------------------------------
 
-_KP_SQE_ORDER = ["A", "B", "C", "D", "E", "F", "G", "H"]  # best → worst
+_KP_SQE_ORDER = ["A", "B", "C", "D", "E", "F", "G", "H"]  # best -> worst
 
 def clean_credscore(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -342,7 +341,7 @@ def clean_credscore(df: pd.DataFrame) -> pd.DataFrame:
                 .drop_duplicates(subset=["CONTRIB"])
                 .reset_index(drop=True))
 
-    # Drop date column – no longer needed for modelling
+    # Drop date column - no longer needed for modelling
     df.drop(columns=["sys_data_procura"], inplace=True, errors="ignore")
     df.drop(columns=["sys_numero_submissao"], inplace=True, errors="ignore")
 
@@ -392,6 +391,7 @@ def clean_fama(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+
 # -------------- MERGE --------------------------------------------------------
 
 def merge_datasets(
@@ -403,15 +403,13 @@ def merge_datasets(
     """
     Merge all 4 cleaned datasets into a single Analytical Base Table (ABT).
 
-    Join strategy
-    -------------
-    - bdoss  ← (left) base table (one row per loan × observation month)
-    - crc    ← left-join on [CONTRIB, OBS_DATE]  (bureau data for same month)
-    - credscore ← left-join on [CONTRIB]          (latest credit score)
-    - fama   ← left-join on [CONTRIB]             (latest customer features)
+    Join strategy:
+    - bdoss      <- (left) base table                 (one row per loan × observation month)
+    - crc        <- left-join on [CONTRIB, OBS_DATE]  (bureau data for same month)
+    - credscore  <- left-join on [CONTRIB]            (latest credit score)
+    - fama       <- left-join on [CONTRIB]            (latest customer features)
 
-    Returns
-    -------
+    Returns:
     Merged DataFrame with the RISK target column preserved.
     """
     print("[merge] Starting merge...")
@@ -436,6 +434,7 @@ def merge_datasets(
     return abt
 
 
+
 # -------------- SAVE ---------------------------------------------------------
 
 def save_prepared(df: pd.DataFrame, path: str = "../data/prepared/abt.parquet"):
@@ -445,4 +444,8 @@ def save_prepared(df: pd.DataFrame, path: str = "../data/prepared/abt.parquet"):
     """
     os.makedirs(os.path.dirname(path), exist_ok=True)
     df.to_parquet(path, index=False)
-    print(f"[save] ABT saved → {path}  |  shape: {df.shape}")
+    print(f"[save] ABT saved -> {path}  |  shape: {df.shape}")
+
+
+
+
