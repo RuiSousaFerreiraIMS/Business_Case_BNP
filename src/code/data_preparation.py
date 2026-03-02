@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import warnings
+import matplotlib.pyplot as plt
 
 warnings.filterwarnings("ignore")
 sns.set_theme(style="whitegrid", palette="muted")
@@ -51,6 +52,109 @@ Duplicate rows:           {duplicates:,}
 """
 
     return summary_text
+
+
+def visualize_by_variable(df, max_cat=10, dataset_name="Dataset"):
+    """
+    Visualizations per variable: each variable gets a row with 3 plots
+    - Numeric: histogram | boxplot | missing %
+    - Categorical: countplot | top N categories | missing %
+    - Datetime: count per year | count per month | count per weekday
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    categorical_cols = df.select_dtypes(include=['object', 'category']).columns
+    datetime_cols = df.select_dtypes(include=['datetime', 'datetime64[ns]']).columns
+    all_cols = df.columns
+
+    n_rows = len(all_cols)
+    fig, axes = plt.subplots(n_rows, 3, figsize=(15, n_rows * 3))
+
+    if n_rows == 1:
+        axes = np.expand_dims(axes, axis=0)
+
+    for i, col in enumerate(all_cols):
+        col_data = df[col]
+
+        # ------------------------
+        # Numeric columns
+        # ------------------------
+        if col in numeric_cols:
+            non_null = col_data.dropna()
+            # Histogram
+            sns.histplot(non_null, bins=30, kde=True, ax=axes[i, 0])
+            axes[i, 0].set_title(f"{col} histogram")
+
+            # Boxplot
+            if not non_null.empty:
+                sns.boxplot(x=non_null, ax=axes[i, 1])
+                axes[i, 1].set_title(f"{col} boxplot")
+
+            # Missing %
+            missing_pct = col_data.isnull().mean() * 100
+            axes[i, 2].bar(0, missing_pct)
+            axes[i, 2].set_title(f"{col} missing %")
+            axes[i, 2].set_xticks([])
+            axes[i, 2].set_ylim(0, 100)
+
+        # ------------------------
+        # Categorical columns
+        # ------------------------
+        elif col in categorical_cols:
+            if col_data.nunique() <= max_cat:
+                sns.countplot(y=col, data=df, order=col_data.value_counts().index, ax=axes[i, 0])
+                axes[i, 0].set_title(f"{col} countplot")
+
+                top_counts = col_data.value_counts().head(max_cat)
+                axes[i, 1].barh(top_counts.index, top_counts.values)
+                axes[i, 1].set_title(f"{col} top {max_cat}")
+            else:
+                axes[i, 0].text(0.5, 0.5, "Too many categories", ha='center')
+                axes[i, 0].set_title(f"{col} skipped")
+                axes[i, 1].axis('off')
+
+            missing_pct = col_data.isnull().mean() * 100
+            axes[i, 2].bar(0, missing_pct)
+            axes[i, 2].set_title(f"{col} missing %")
+            axes[i, 2].set_xticks([])
+            axes[i, 2].set_ylim(0, 100)
+
+        # ------------------------
+        # Datetime columns
+        # ------------------------
+        elif col in datetime_cols:
+            non_null = col_data.dropna()
+            if not non_null.empty:
+                df_temp = non_null.to_frame()
+                df_temp['year'] = df_temp[col].dt.year
+                df_temp['month'] = df_temp[col].dt.month
+                df_temp['weekday'] = df_temp[col].dt.day_name()
+
+                sns.countplot(x='year', data=df_temp, ax=axes[i, 0])
+                axes[i, 0].set_title(f"{col} by year")
+
+                sns.countplot(x='month', data=df_temp, ax=axes[i, 1])
+                axes[i, 1].set_title(f"{col} by month")
+
+                sns.countplot(x='weekday', data=df_temp, ax=axes[i, 2],
+                              order=['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])
+                axes[i, 2].set_title(f"{col} by weekday")
+            else:
+                axes[i, 0].text(0.5, 0.5, "No data", ha='center')
+                axes[i, 0].set_title(f"{col} empty")
+                axes[i, 1].axis('off')
+                axes[i, 2].axis('off')
+
+        # ------------------------
+        # Other columns
+        # ------------------------
+        else:
+            axes[i, 0].text(0.5, 0.5, "Plot skipped", ha='center')
+            axes[i, 0].set_title(f"{col}")
+            axes[i, 1].axis('off')
+            axes[i, 2].axis('off')
+
+    plt.tight_layout()
+    plt.show()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
