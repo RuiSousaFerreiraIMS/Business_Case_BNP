@@ -1,11 +1,14 @@
-import pandas as pd
-import seaborn as sns
+# src/code/data_functions.py
+from src.code.io_utils import load, data_path
 
-import warnings
+def load_bdoss(parse_dates=None):
+    return load(data_path("bdoss.csv"), parse_dates=parse_dates)
 
-warnings.filterwarnings("ignore")
-sns.set_theme(style="whitegrid", palette="muted")
+def load_crc(parse_dates=None):
+    return load(data_path("crc.csv"), parse_dates=parse_dates)
 
-def load(file_name: str, parse_dates=None) -> pd.DataFrame:
-    df = pd.read_csv(file_name, parse_dates=parse_dates)
-    return df
+def load_credscore(parse_dates=None):
+    return load(data_path("credscore.csv"), parse_dates=parse_dates)
+
+def load_fama(parse_dates=None):
+    return load(data_path("fama.csv"), parse_dates=parse_dates)
