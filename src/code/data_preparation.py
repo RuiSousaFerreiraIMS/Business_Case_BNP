@@ -435,17 +435,3 @@ def merge_datasets(
 
 
 
-# -------------- SAVE ---------------------------------------------------------
-
-def save_prepared(df: pd.DataFrame, path: str = "../data/prepared/abt.parquet"):
-    """
-    Save the Analytical Base Table (ABT) to disk.
-    Creates the directory if it does not exist.
-    """
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    df.to_parquet(path, index=False)
-    print(f"[save] ABT saved -> {path}  |  shape: {df.shape}")
-
-
-
-
