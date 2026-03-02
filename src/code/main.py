@@ -1,4 +1,4 @@
-from src.features.converter_functions import convert_parquet_to_csv
+from src.code.converter_functions import convert_parquet_to_csv
 
 if __name__ == "__main__":
     path_csv = "../data/converted"
