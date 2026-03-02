@@ -1,9 +1,13 @@
 import os
 import pandas as pd
 
-# Default folders
-DATA_DIR = "../../data/converted/"  # original data
-OUTPUT_DIR = "../../data/"  # data outputs
+# Resolve paths relative to this file's location (src/code/),
+# so they work regardless of where Jupyter's working directory is set.
+_SRC_DIR = os.path.dirname(os.path.abspath(__file__))          # .../src/code
+_PROJECT_ROOT = os.path.abspath(os.path.join(_SRC_DIR, "..", ".."))  # project root
+
+DATA_DIR = os.path.join(_PROJECT_ROOT, "data", "converted")   # original data
+OUTPUT_DIR = os.path.join(_PROJECT_ROOT, "data")               # data outputs
 
 def data_path(file_name: str) -> str:
     """Return full path for converted data."""
