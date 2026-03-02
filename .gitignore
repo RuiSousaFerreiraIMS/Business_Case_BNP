@@ -1,14 +1,14 @@
 # Data files
 
-/src/data/raw/bdoss.parquet
-/src/data/raw/crc.parquet
-/src/data/raw/credscore.parquet
-/src/data/raw/fama.parquet
+/data/raw/bdoss.parquet
+/data/raw/crc.parquet
+/data/raw/credscore.parquet
+/data/raw/fama.parquet
 
-/src/data/converted/bdoss.csv
-/src/data/converted/crc.csv
-/src/data/converted/credscore.csv
-/src/data/converted/fama.csv
+/data/converted/bdoss.csv
+/data/converted/crc.csv
+/data/converted/credscore.csv
+/data/converted/fama.csv
 
 
 # Python

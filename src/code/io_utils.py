@@ -2,8 +2,8 @@ import os
 import pandas as pd
 
 # Default folders
-DATA_DIR = "../data/converted/"  # original data
-OUTPUT_DIR = "../data/"          # data outputs
+DATA_DIR = "../../data/converted/"  # original data
+OUTPUT_DIR = "../../data/"  # data outputs
 
 def data_path(file_name: str) -> str:
     """Return full path for converted data."""
