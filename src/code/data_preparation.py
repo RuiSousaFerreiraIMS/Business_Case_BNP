@@ -161,6 +161,244 @@ def visualize_by_variable(df, max_cat=10, dataset_name="Dataset"):
 # DATA PREPARATION HELPERS (for use in 2.Data_Preparation.ipynb)
 # ─────────────────────────────────────────────────────────────────────────────
 
+def initial_preparation(
+    df: pd.DataFrame,
+    dataset_name: str = "Dataset",
+    datetime_cols: list[str] | None = None,
+    cols_to_remove: list[str] | None = None,
+    datetime_format: str | None = None,
+) -> pd.DataFrame:
+    """
+    Step 1 - Initial preparation for any dataset.
+
+    Args:
+        df              : Input DataFrame.
+        dataset_name    : Name to display in the summary (optional).
+        datetime_cols   : Columns to convert to datetime (optional).
+        cols_to_remove  : Columns to drop (optional).
+        datetime_format : Datetime format string e.g. '%Y-%m-%d' (optional).
+                          If None, pandas will infer the format automatically.
+
+    Returns:
+        Cleaned and prepared DataFrame.
+    """
+    df = df.copy()
+    original_cols = set(df.columns)
+
+    # --- Convert to datetime ---
+    converted = []
+    if datetime_cols:
+        for col in datetime_cols:
+            if col in df.columns:
+                df[col] = pd.to_datetime(df[col], format=datetime_format, errors="coerce")
+                converted.append(col)
+
+    # --- Remove columns ---
+    removed = []
+    if cols_to_remove:
+        existing = [col for col in cols_to_remove if col in df.columns]
+        df = df.drop(columns=existing)
+        removed = existing
+
+    # --- Summary ---
+    final_cols = list(df.columns)
+
+    print(f"[{dataset_name}]")
+    print(f"  Removed   ({len(removed)})  : {removed if removed else '—'}")
+    print(f"  Datetime  ({len(converted)}) : {converted if converted else '—'}")
+    print(f"  Remaining ({len(final_cols)}): {final_cols}")
+    print()
+
+    return df
+
+def handle_missing_values(
+    df: pd.DataFrame,
+    dataset_name: str = "Dataset",
+    numeric_strategy: str = "median",  # "mean" | "median" | "fixed"
+    numeric_fill_value: float | None = None,
+    datetime_strategy: str = "ffill",  # "ffill" | "bfill" | "drop"
+    drop_row_threshold: float = 0.5,
+) -> pd.DataFrame:
+    """
+    Step 2 - Handle missing values.
+
+    Args:
+        df                  : Input DataFrame.
+        dataset_name        : Name to display in the summary.
+        numeric_strategy    : Strategy for numeric columns — 'mean', 'median', or 'fixed'.
+        numeric_fill_value  : Value to use when numeric_strategy='fixed'.
+        datetime_strategy   : Strategy for datetime columns — 'ffill', 'bfill', or 'drop'.
+        drop_row_threshold  : Drop rows where the fraction of missing values exceeds this (0–1).
+                              Applied before column-level imputation.
+
+    Returns:
+        DataFrame with missing values handled.
+    """
+    df = df.copy()
+
+    # --- Diagnóstico inicial ---
+    missing_before = df.isnull().sum()
+    total_missing_before = missing_before.sum()
+
+    # --- Drop rows com muitos missings ---
+    rows_before = len(df)
+    df = df.dropna(thresh=int(df.shape[1] * (1 - drop_row_threshold)))
+    rows_dropped = rows_before - len(df)
+
+    # --- Separar colunas por tipo ---
+    numeric_cols = df.select_dtypes(include="number").columns.tolist()
+    datetime_cols = df.select_dtypes(include="datetime").columns.tolist()
+    categorical_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
+
+    # --- Imputar numéricas ---
+    numeric_imputed = []
+    for col in numeric_cols:
+        if df[col].isnull().any():
+            if numeric_strategy == "mean":
+                df[col] = df[col].fillna(df[col].mean())
+            elif numeric_strategy == "median":
+                df[col] = df[col].fillna(df[col].median())
+            elif numeric_strategy == "fixed":
+                df[col] = df[col].fillna(numeric_fill_value)
+            numeric_imputed.append(col)
+
+    # --- Imputar datas ---
+    datetime_imputed = []
+    for col in datetime_cols:
+        if df[col].isnull().any():
+            if datetime_strategy == "ffill":
+                df[col] = df[col].ffill()
+            elif datetime_strategy == "bfill":
+                df[col] = df[col].bfill()
+            elif datetime_strategy == "drop":
+                df = df.dropna(subset=[col])
+            datetime_imputed.append(col)
+
+    # --- Imputar categóricas ---
+    categorical_imputed = []
+    for col in categorical_cols:
+        if df[col].isnull().any():
+            df[col] = df[col].fillna("Unknown")
+            categorical_imputed.append(col)
+
+    # --- Summary ---
+    missing_after = df.isnull().sum().sum()
+
+    print(f"[{dataset_name}]")
+    print(f"  Missing before     : {total_missing_before}")
+    print(f"  Rows dropped       : {rows_dropped}  (threshold: >{int(drop_row_threshold*100)}% missing)")
+    print(f"  Numeric imputed  ({len(numeric_imputed)}) [{numeric_strategy}] : {numeric_imputed if numeric_imputed else '—'}")
+    print(f"  Datetime imputed ({len(datetime_imputed)}) [{datetime_strategy}]  : {datetime_imputed if datetime_imputed else '—'}")
+    print(f"  Categ.  imputed  ({len(categorical_imputed)}) [Unknown]  : {categorical_imputed if categorical_imputed else '—'}")
+    print(f"  Missing after      : {missing_after}")
+    print()
+
+    return df
+
+def handle_duplicates(
+    df: pd.DataFrame,
+    dataset_name: str = "Dataset",
+    key_cols: list[str] | None = None,
+) -> pd.DataFrame:
+    """
+    Step 3 - Handle duplicates.
+
+    Args:
+        df          : Input DataFrame.
+        dataset_name: Name to display in the summary.
+        key_cols    : Columns that define a unique record (optional).
+                      If provided, duplicate keys are resolved by keeping
+                      the row with the fewest missing values.
+
+    Returns:
+        DataFrame with duplicates removed.
+    """
+    df = df.copy()
+    rows_before = len(df)
+
+    # --- Duplicados exatos ---
+    exact_before = len(df)
+    df = df.drop_duplicates()
+    exact_dropped = exact_before - len(df)
+
+    # --- Duplicados por chave ---
+    key_dropped = 0
+    if key_cols:
+        existing_keys = [col for col in key_cols if col in df.columns]
+        if existing_keys:
+            # Para cada grupo de chave duplicada, manter a linha com menos missings
+            df["_missing_count"] = df.isnull().sum(axis=1)
+            df = (
+                df.sort_values("_missing_count")
+                  .drop_duplicates(subset=existing_keys, keep="first")
+                  .drop(columns="_missing_count")
+            )
+            key_dropped = (exact_before - exact_dropped) - len(df)
+
+    # --- Summary ---
+    total_dropped = rows_before - len(df)
+
+    print(f"[{dataset_name}]")
+    print(f"  Rows before        : {rows_before}")
+    print(f"  Exact duplicates   : {exact_dropped} dropped")
+    print(f"  Key duplicates     : {key_dropped} dropped  (key: {key_cols if key_cols else '—'})")
+    print(f"  Rows after         : {len(df)}  (total dropped: {total_dropped})")
+    print()
+
+    return df
+
+def detect_outliers(
+    df: pd.DataFrame,
+    dataset_name: str = "Dataset",
+    iqr_threshold: float = 1.5,
+    zscore_threshold: float = 3.0,
+) -> pd.DataFrame:
+    """
+    Step 4 - Detect outliers in numeric columns (no data is modified).
+
+    Args:
+        df               : Input DataFrame.
+        dataset_name     : Name to display in the summary.
+        iqr_threshold    : IQR multiplier to define outlier bounds (default: 1.5).
+        zscore_threshold : Z-score threshold to flag outliers (default: 3.0).
+
+    Returns:
+        None — outliers are only reported, no data is modified.
+    """
+    numeric_cols = df.select_dtypes(include="number").columns.tolist()
+
+    print(f"[{dataset_name}] Outlier Detection")
+    print(f"  {'Column':<25} {'IQR outliers':>14} {'Z-score outliers':>17} {'% rows':>8}")
+    print(f"  {'-'*25} {'-'*14} {'-'*17} {'-'*8}")
+
+    total_iqr = 0
+    total_z = 0
+
+    for col in numeric_cols:
+        series = df[col].dropna()
+
+        # IQR
+        q1, q3 = series.quantile(0.25), series.quantile(0.75)
+        iqr = q3 - q1
+        iqr_mask = (df[col] < q1 - iqr_threshold * iqr) | (df[col] > q3 + iqr_threshold * iqr)
+        iqr_count = iqr_mask.sum()
+
+        # Z-score
+        z_scores = (df[col] - series.mean()) / series.std()
+        z_mask = z_scores.abs() > zscore_threshold
+        z_count = z_mask.sum()
+
+        pct = round(max(iqr_count, z_count) / len(df) * 100, 1)
+        total_iqr += iqr_count
+        total_z += z_count
+
+        print(f"  {col:<25} {iqr_count:>14} {z_count:>17} {pct:>7}%")
+
+    print(f"  {'-'*25} {'-'*14} {'-'*17} {'-'*8}")
+    print(f"  {'TOTAL':<25} {total_iqr:>14} {total_z:>17}")
+    print()
+
+
 # -------------- BDOSS --------------------------------------------------------
 
 def _encode_risk(risk_series: pd.Series) -> pd.Series:
@@ -207,49 +445,6 @@ def clean_bdoss(df: pd.DataFrame) -> pd.DataFrame:
     # 2. ENCODE RISK (binary)
     df["RISK"] = _encode_risk(df["RISK"])
 
-    # 3. DERIVED TIME FEATURES
-    # pandas does not support timedelta64 with unit 'M' (months are ambiguous).
-    # we'll use year/month arithmetic instead for an exact month count.
-    if "DCREAT" in df.columns and "OBS_DATE" in df.columns:
-        obs_ym = df["OBS_DATE"].dt.year * 12 + df["OBS_DATE"].dt.month
-        cre_ym = df["DCREAT"].dt.year * 12 + df["DCREAT"].dt.month
-        df["loan_age_months"] = (obs_ym - cre_ym).astype("Int64")
-
-    if "loan_age_months" in df.columns and "DURDEG" in df.columns:
-        df["remaining_months"] = (df["DURDEG"] - df["loan_age_months"]).astype("Int64")
-
-    # 4. NUMERIC IMPUTATION (median)
-    num_impute_cols = [
-        "DURDEG", "RANGPRO", "RANGCLI", "MENSALIDADE_CORR",
-        "RESSO", "NBENF", "BICONTRATO", "RISKA", "AGFIN", "SREC",
-        "ACTIVIDADE_GLOBAL", "RN", "RD", "CSP",
-    ]
-    for col in num_impute_cols:
-        if col in df.columns:
-            median_val = df[col].median()
-            df[col] = df[col].fillna(median_val)
-
-    # MENSALIDADE_CORR: fill with MENSALIDADE where available
-    if "MENSALIDADE_CORR" in df.columns and "MENSALIDADE" in df.columns:
-        df["MENSALIDADE_CORR"] = df["MENSALIDADE_CORR"].fillna(df["MENSALIDADE"])
-
-    # 5. CATEGORICAL ENCODING
-    # OHE only low-cardinality columns (< ~20 unique values).
-    # PTT is a 4-digit postal code with 763 unique values - OHE would create 763 new columns × 2.6M rows -> kernel crash!
-    # We will cast to int instead.
-    # TYPEPROD has only 1 unique value -> useless, will be dropped.
-    if "PTT" in df.columns:
-        df["PTT"] = pd.to_numeric(df["PTT"], errors="coerce").astype("Int64")
-
-    ohe_cols = ["POS", "PAGAMENTO", "NATIO", "MODCONTACTO",
-                "POLE", "TYPEPROD", "PRODALP"]
-    for col in ohe_cols:
-        if col in df.columns:
-            # Cast to 'category' dtype first to reduce memory before expansion
-            df[col] = df[col].astype("category")
-            dummies = pd.get_dummies(df[col], prefix=col, drop_first=False, dtype=np.int8)
-            df = pd.concat([df, dummies], axis=1)
-            df.drop(columns=[col], inplace=True)
 
     # 6. DROP RAW DATE COLS, ID COLS, EMPTY COLS AND CONSTANT COLS
     # TYPEPROD has 1 unique value -> constant -> no predictive value
