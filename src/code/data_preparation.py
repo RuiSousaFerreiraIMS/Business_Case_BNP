@@ -347,6 +347,81 @@ def handle_duplicates(
 
     return df
 
+def drop_exact_duplicates(
+    df: pd.DataFrame,
+    dataset_name: str = "Dataset",
+) -> pd.DataFrame:
+    """
+    Step 3.1 - Drop exact duplicates.
+
+    Args:
+        df          : Input DataFrame.
+        dataset_name: Name to display in the summary.
+
+    Returns:
+        DataFrame with exact duplicates removed.
+    """
+    df = df.copy()
+    rows_before = len(df)
+
+    # --- Exact duplicates ---
+    df = df.drop_duplicates()
+    exact_dropped = rows_before - len(df)
+
+    # --- Summary ---
+    print(f"[{dataset_name}]")
+    print(f"  Rows before        : {rows_before}")
+    print(f"  Exact duplicates   : {exact_dropped} dropped")
+    print(f"  Rows after         : {len(df)}")
+    print()
+
+    return df
+
+def count_key_duplicates(
+    df: pd.DataFrame,
+    dataset_name: str = "Dataset",
+    key_cols: list[str] = None,
+) -> pd.DataFrame:
+    """
+    Step 3.2 - Count duplicates based on specific key columns.
+    This is purely analytical and does not drop any rows.
+
+    Args:
+        df          : Input DataFrame.
+        dataset_name: Name to display in the summary.
+        key_cols    : Columns that define a unique record.
+
+    Returns:
+        The original DataFrame (unmodified).
+    """
+    if not key_cols:
+        print(f"[{dataset_name}] No key columns provided for duplication check.")
+        return df
+        
+    existing_keys = [col for col in key_cols if col in df.columns]
+    if not existing_keys:
+        print(f"[{dataset_name}] Key columns not found in dataset.")
+        return df
+
+    key_counts = (
+        df.groupby(existing_keys)
+          .size()
+          .reset_index(name="count")
+          .sort_values("count", ascending=False)
+    )
+    n_dup_keys = (key_counts["count"] > 1).sum()
+
+    print(f"[{dataset_name}] Key Duplicates Analysis")
+    print(f"  Analyzed keys      : {existing_keys}")
+    print(f"  Key duplicates     : {n_dup_keys} keys with more than 1 row")
+    
+    if n_dup_keys > 0:
+        print(f"\n  Top duplicated keys:")
+        # Only show the rows that are actually duplicated, up to 5
+        print(key_counts[key_counts["count"] > 1].head(5).to_string(index=False))
+    print()
+
+
 def detect_outliers(
     df: pd.DataFrame,
     dataset_name: str = "Dataset",
