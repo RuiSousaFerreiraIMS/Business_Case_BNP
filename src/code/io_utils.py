@@ -28,11 +28,29 @@ def load(file_path: str, parse_dates=None) -> pd.DataFrame:
     print(f"[LOAD] {file_path} | shape: {df.shape}")
     return df
 
+def _sanitize_for_parquet(df: pd.DataFrame) -> pd.DataFrame:
+    """Cast object columns containing oversized Python ints to float64 so PyArrow doesn't overflow."""
+    df = df.copy()
+    int64_max = 2**63 - 1
+    int64_min = -(2**63)
+    for col in df.select_dtypes(include="object").columns:
+        sample = df[col].dropna()
+        if sample.empty:
+            continue
+        if all(isinstance(v, int) for v in sample.iloc[:100]):
+            col_max = sample.max()
+            col_min = sample.min()
+            if col_max > int64_max or col_min < int64_min:
+                df[col] = df[col].astype("float64")
+    return df
+
+
 def save(df: pd.DataFrame, file_path: str, index=False):
     ext = os.path.splitext(file_path)[1].lower()
     if ext == ".csv":
         df.to_csv(file_path, index=index)
     elif ext in [".parquet", ".pq"]:
+        df = _sanitize_for_parquet(df)
         df.to_parquet(file_path, index=index)
     else:
         raise ValueError("Unsupported file format. Use .csv or .parquet")
