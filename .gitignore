@@ -13,3 +13,11 @@
 
 # Python
 __pycache__/
+data/prepared/abt_first_objective.parquet
+data/prepared/abt.parquet
+data/prepared/bdoss_aggregated.parquet
+data/prepared/bdoss_clean.parquet
+data/prepared/bdoss_customer.parquet
+data/prepared/crc_clean.parquet
+data/prepared/credscore_clean.parquet
+data/prepared/fama_clean.parquet
