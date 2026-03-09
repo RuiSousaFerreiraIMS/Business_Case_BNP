@@ -511,6 +511,70 @@ import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 
+class ClientOneHotEncoder(BaseEstimator, TransformerMixin):
+    """One-hot encodes designated categorical columns robustly.
+    
+    Learns categories during fit() to ensure consistent dummy columns during
+    transform(), even if some categories are missing in the test/inference data.
+    
+    Args:
+        cols: List of column names to encode. If None, defaults to ['sdem_SITFAM', 'sdem_HABITAT'].
+        drop_first: Whether to drop the first category encoded to avoid collinearity.
+        verbose: If True, prints a summary after each transform() call.
+    """
+    def __init__(
+        self,
+        cols: list[str] | None = None,
+        drop_first: bool = False,
+        verbose: bool = False,
+    ):
+        if cols is None:
+            cols = ["sdem_SITFAM", "sdem_HABITAT"]
+        self.cols = cols
+        self.drop_first = drop_first
+        self.verbose = verbose
+        self.dummy_columns_ = []
+        
+    def fit(self, X: pd.DataFrame, y=None):
+        X_df = pd.DataFrame(X)
+        cols_to_fit = [c for c in self.cols if c in X_df.columns]
+        if cols_to_fit:
+            # Generate dummies on training to learn exact column structure
+            dummies = pd.get_dummies(
+                X_df[cols_to_fit], 
+                columns=cols_to_fit, 
+                drop_first=self.drop_first,
+                dtype=int
+            )
+            self.dummy_columns_ = dummies.columns.tolist()
+        return self
+        
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        df = pd.DataFrame(X).copy()
+        cols_to_transform = [c for c in self.cols if c in df.columns]
+        
+        if cols_to_transform:
+            dummies = pd.get_dummies(
+                df[cols_to_transform], 
+                columns=cols_to_transform, 
+                drop_first=self.drop_first,
+                dtype=int
+            )
+            # Align with columns learned during fit()
+            # Missing columns are filled with 0, extra columns are dropped
+            dummies = dummies.reindex(columns=self.dummy_columns_, fill_value=0)
+            
+            df = pd.concat([df, dummies], axis=1)
+            df.drop(columns=cols_to_transform, inplace=True)
+            
+        if self.verbose:
+            print("[ClientOneHotEncoder]")
+            print(f"  Encoded cols : {cols_to_transform}")
+            print(f"  New features : {len(self.dummy_columns_)}")
+            print()
+            
+        return df
+
 
 class ClientFeatureEngineer(BaseEstimator, TransformerMixin):
     """Creates domain-informed features for early settlement and churn prediction.

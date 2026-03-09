@@ -220,8 +220,8 @@ def initial_preparation(
 def handle_missing_values(
     df: pd.DataFrame,
     dataset_name: str = "Dataset",
-    numeric_strategy: str = "median",  # "mean" | "median" | "fixed"
-    numeric_fill_value: float | None = None,
+    numeric_strategy: str = "fixed",  # "fixed" only (mean/median removed to prevent global leakage)
+    numeric_fill_value: float | None = 0.0,
     datetime_strategy: str = "ffill",  # "ffill" | "bfill" | "drop"
     drop_row_threshold: float = 0.5,
 ) -> pd.DataFrame:
@@ -231,8 +231,10 @@ def handle_missing_values(
     Args:
         df                  : Input DataFrame.
         dataset_name        : Name to display in the summary.
-        numeric_strategy    : Strategy for numeric columns — 'mean', 'median', or 'fixed'.
-        numeric_fill_value  : Value to use when numeric_strategy='fixed'.
+        numeric_strategy    : Strategy for numeric columns ('fixed' only).
+                              NOTE: 'mean' and 'median' were removed to prevent global data leakage.
+                              Rely on the ML Pipeline (ClientImputer) for statistical imputation.
+        numeric_fill_value  : Value to use when numeric_strategy='fixed' (default 0.0).
         datetime_strategy   : Strategy for datetime columns — 'ffill', 'bfill', or 'drop'.
         drop_row_threshold  : Drop rows where the fraction of missing values exceeds this (0-1).
                               Applied before column-level imputation.
@@ -260,11 +262,7 @@ def handle_missing_values(
     numeric_imputed = []
     for col in numeric_cols:
         if df[col].isnull().any():
-            if numeric_strategy == "mean":
-                df[col] = df[col].fillna(df[col].mean())
-            elif numeric_strategy == "median":
-                df[col] = df[col].fillna(df[col].median())
-            elif numeric_strategy == "fixed":
+            if numeric_strategy == "fixed":
                 df[col] = df[col].fillna(numeric_fill_value)
             numeric_imputed.append(col)
 
@@ -353,79 +351,7 @@ def handle_duplicates(
 
     return df
 
-def drop_exact_duplicates(
-    df: pd.DataFrame,
-    dataset_name: str = "Dataset",
-) -> pd.DataFrame:
-    """
-    Step 3.1 - Drop exact duplicates.
 
-    Args:
-        df          : Input DataFrame.
-        dataset_name: Name to display in the summary.
-
-    Returns:
-        DataFrame with exact duplicates removed.
-    """
-    df = df.copy()
-    rows_before = len(df)
-
-    # Exact duplicates
-    df = df.drop_duplicates()
-    exact_dropped = rows_before - len(df)
-
-    # SUMMARY
-    print(f"[{dataset_name}]")
-    print(f"  Rows before        : {rows_before}")
-    print(f"  Exact duplicates   : {exact_dropped} dropped")
-    print(f"  Rows after         : {len(df)}")
-    print()
-
-    return df
-
-def count_key_duplicates(
-    df: pd.DataFrame,
-    dataset_name: str = "Dataset",
-    key_cols: list[str] = None,
-) -> pd.DataFrame:
-    """
-    Step 3.2 - Count duplicates based on specific key columns.
-    This is purely analytical and does not drop any rows.
-
-    Args:
-        df          : Input DataFrame.
-        dataset_name: Name to display in the summary.
-        key_cols    : Columns that define a unique record.
-
-    Returns:
-        The original DataFrame (unmodified).
-    """
-    if not key_cols:
-        print(f"[{dataset_name}] No key columns provided for duplication check.")
-        return df
-        
-    existing_keys = [col for col in key_cols if col in df.columns]
-    if not existing_keys:
-        print(f"[{dataset_name}] Key columns not found in dataset.")
-        return df
-
-    key_counts = (
-        df.groupby(existing_keys)
-          .size()
-          .reset_index(name="count")
-          .sort_values("count", ascending=False)
-    )
-    n_dup_keys = (key_counts["count"] > 1).sum()
-
-    print(f"[{dataset_name}] Key Duplicates Analysis")
-    print(f"  Analyzed keys      : {existing_keys}")
-    print(f"  Key duplicates     : {n_dup_keys} keys with more than 1 row")
-    
-    if n_dup_keys > 0:
-        print(f"\n  Top duplicated keys:")
-        # Only show the rows that are actually duplicated, up to 5
-        print(key_counts[key_counts["count"] > 1].head(5).to_string(index=False))
-    print()
 
 
 def detect_outliers(
@@ -618,14 +544,13 @@ def clean_credscore(df: pd.DataFrame) -> pd.DataFrame:
         )
         df.drop(columns=["kp_sqe"], inplace=True)
 
-    # Keep most-recent record per contributor
+    # Sort by date but DO NOT drop duplicates to preserve history for point-in-time merges
     if "sys_data_procura" in df.columns:
-        df = (df.sort_values("sys_data_procura", ascending=False)
-                .drop_duplicates(subset=["CONTRIB"])
+        df = (df.sort_values(["CONTRIB", "sys_data_procura"], ascending=[True, False])
                 .reset_index(drop=True))
 
-    # Drop date column - no longer needed for modelling
-    df.drop(columns=["sys_data_procura"], inplace=True, errors="ignore")
+    # Do not drop date column - needed for point-in-time merge downstream!
+    # df.drop(columns=["sys_data_procura"], inplace=True, errors="ignore")
     df.drop(columns=["sys_numero_submissao"], inplace=True, errors="ignore")
 
     print(f"[clean_credscore] shape: {df.shape}")
@@ -649,22 +574,16 @@ def clean_fama(df: pd.DataFrame) -> pd.DataFrame:
     if "Date_Obs" in df.columns:
         df["Date_Obs"] = pd.to_datetime(df["Date_Obs"], errors="coerce")
 
-    # Keep latest record per contributor
+    # Sort by date but DO NOT drop duplicates to preserve history for point-in-time merges
     if "Date_Obs" in df.columns:
-        df = (df.sort_values("Date_Obs", ascending=False)
-                .drop_duplicates(subset=["CONTRIB"])
+        df = (df.sort_values(["CONTRIB", "Date_Obs"], ascending=[True, False])
                 .reset_index(drop=True))
 
-    # One-hot encode socio-demographic categoricals
-    ohe_cols = ["sdem_SITFAM", "sdem_HABITAT"]
-    for col in ohe_cols:
-        if col in df.columns:
-            dummies = pd.get_dummies(df[col], prefix=col, drop_first=False, dtype=int)
-            df = pd.concat([df, dummies], axis=1)
-            df.drop(columns=[col], inplace=True)
+    # NOTE: One-Hot Encoding for 'sdem_SITFAM' and 'sdem_HABITAT' must be handled
+    # by the ML Pipeline (ClientDataCleaner) to avoid feature mismatch during inference.
 
-    # Drop date column
-    df.drop(columns=["Date_Obs"], inplace=True, errors="ignore")
+    # Do not drop date column - needed for point-in-time merge downstream!
+    # df.drop(columns=["Date_Obs"], inplace=True, errors="ignore")
 
     # Numeric cols pass through. Missing values will be imputed by ClientImputer per CV fold
     # to avoid data leakage.
