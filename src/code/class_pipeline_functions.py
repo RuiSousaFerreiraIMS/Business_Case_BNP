@@ -191,7 +191,7 @@ class ClientOutlierHandler(BaseEstimator, TransformerMixin):
             With 2 methods, setting min_votes=2 means both must agree —
             recommended to avoid removing legitimate extreme clients.
         iqr_k: Multiplier for the IQR fence. Standard is 1.5. Increase
-            to 2.0–2.5 to be more conservative with tree-based models.
+            to 2.0-2.5 to be more conservative with tree-based models.
         z_thresh: Threshold for the modified Z-score. Standard is 3.5.
         skip_discrete: If True, skips columns with fewer unique values
             than discrete_unique_thresh. Avoids treating binary flags
@@ -804,12 +804,13 @@ class ClientFeatureEngineer(BaseEstimator, TransformerMixin):
         Positive = improving (lower risk), negative = deteriorating.
 
         Args:
-            risk_str: 24-character risk position string.
+            risk_str: 24-character risk position string (or integer missing leading zeros).
 
         Returns:
             Float trend score. 0.0 if string is too short or invalid.
         """
-        cleaned = str(risk_str).strip()
+        # Strip string, drop any decimal (if float), and zero pad to 24 characters
+        cleaned = str(risk_str).strip().split('.')[0].zfill(24)
         if len(cleaned) < 6:
             return 0.0
         try:
@@ -826,12 +827,14 @@ class ClientFeatureEngineer(BaseEstimator, TransformerMixin):
         """Count risk-position changes in the last 12 months.
 
         Args:
-            risk_str: 24-character risk position string.
+            risk_str: 24-character risk position string (or integer missing leading zeros).
 
         Returns:
             Integer count of changes. 0 if invalid.
         """
-        last_12 = str(risk_str).strip()[-12:]
+        # Strip string, drop any decimal, zero pad to 24 characters
+        cleaned = str(risk_str).strip().split('.')[0].zfill(24)
+        last_12 = cleaned[-12:]
         digits  = [c for c in last_12 if c.isdigit()]
         if len(digits) < 2:
             return 0
@@ -842,12 +845,14 @@ class ClientFeatureEngineer(BaseEstimator, TransformerMixin):
         """Count consecutive trailing months at the current risk level.
 
         Args:
-            risk_str: 24-character risk position string.
+            risk_str: 24-character risk position string (or integer missing leading zeros).
 
         Returns:
             Integer count. 0 if invalid.
         """
-        digits = [c for c in str(risk_str).strip() if c.isdigit()]
+        # Strip string, drop any decimal, zero pad to 24 characters
+        cleaned = str(risk_str).strip().split('.')[0].zfill(24)
+        digits = [c for c in cleaned if c.isdigit()]
         if not digits:
             return 0
         current = digits[-1]

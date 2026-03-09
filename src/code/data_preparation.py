@@ -10,7 +10,7 @@ sns.set_theme(style="whitegrid", palette="muted")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# DATA UNDERSTANDING (for use in 1.Data_Understanding.ipynb)
+# DATA UNDERSTANDING (to use in 1.Data_Understanding.ipynb)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def data_understanding_summary(df, dataset_name="Dataset"):
@@ -157,8 +157,14 @@ def visualize_by_variable(df, max_cat=10, dataset_name="Dataset"):
     plt.show()
 
 
+
 # ─────────────────────────────────────────────────────────────────────────────
-# DATA PREPARATION HELPERS (for use in 2.Data_Preparation.ipynb)
+# GLOBAL DATA PREPARATION HELPERS (to use in 2.Data_Preparation.ipynb)
+
+# This section contains general-purpose functions for data cleaning and 
+# preparation that can be applied to any dataset without the risk of data leakage. 
+# They are designed to be flexible and configurable via parameters, including 
+# detailed printouts of the actions taken for transparency.
 # ─────────────────────────────────────────────────────────────────────────────
 
 def initial_preparation(
@@ -169,7 +175,7 @@ def initial_preparation(
     datetime_format: str | None = None,
 ) -> pd.DataFrame:
     """
-    Step 1 - Initial preparation for any dataset.
+    Step 1 - Initial preparation for any dataset
 
     Args:
         df              : Input DataFrame.
@@ -185,7 +191,7 @@ def initial_preparation(
     df = df.copy()
     original_cols = set(df.columns)
 
-    # --- Convert to datetime ---
+    # Convert to datetime 
     converted = []
     if datetime_cols:
         for col in datetime_cols:
@@ -193,14 +199,14 @@ def initial_preparation(
                 df[col] = pd.to_datetime(df[col], format=datetime_format, errors="coerce")
                 converted.append(col)
 
-    # --- Remove columns ---
+    # Remove columns 
     removed = []
     if cols_to_remove:
         existing = [col for col in cols_to_remove if col in df.columns]
         df = df.drop(columns=existing)
         removed = existing
 
-    # --- Summary ---
+    # Summary
     final_cols = list(df.columns)
 
     print(f"[{dataset_name}]")
@@ -228,7 +234,7 @@ def handle_missing_values(
         numeric_strategy    : Strategy for numeric columns — 'mean', 'median', or 'fixed'.
         numeric_fill_value  : Value to use when numeric_strategy='fixed'.
         datetime_strategy   : Strategy for datetime columns — 'ffill', 'bfill', or 'drop'.
-        drop_row_threshold  : Drop rows where the fraction of missing values exceeds this (0–1).
+        drop_row_threshold  : Drop rows where the fraction of missing values exceeds this (0-1).
                               Applied before column-level imputation.
 
     Returns:
@@ -236,21 +242,21 @@ def handle_missing_values(
     """
     df = df.copy()
 
-    # --- Diagnóstico inicial ---
+    # Initial diagnostic
     missing_before = df.isnull().sum()
     total_missing_before = missing_before.sum()
 
-    # --- Drop rows com muitos missings ---
+    # Drop rows with too many missing values
     rows_before = len(df)
     df = df.dropna(thresh=int(df.shape[1] * (1 - drop_row_threshold)))
     rows_dropped = rows_before - len(df)
 
-    # --- Separar colunas por tipo ---
+    # Separate columns per type
     numeric_cols = df.select_dtypes(include="number").columns.tolist()
     datetime_cols = df.select_dtypes(include="datetime").columns.tolist()
     categorical_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
 
-    # --- Imputar numéricas ---
+    # Numeric imputation
     numeric_imputed = []
     for col in numeric_cols:
         if df[col].isnull().any():
@@ -262,7 +268,7 @@ def handle_missing_values(
                 df[col] = df[col].fillna(numeric_fill_value)
             numeric_imputed.append(col)
 
-    # --- Imputar datas ---
+    # Dates imputation
     datetime_imputed = []
     for col in datetime_cols:
         if df[col].isnull().any():
@@ -274,14 +280,14 @@ def handle_missing_values(
                 df = df.dropna(subset=[col])
             datetime_imputed.append(col)
 
-    # --- Imputar categóricas ---
+    # Categorical imputation
     categorical_imputed = []
     for col in categorical_cols:
         if df[col].isnull().any():
             df[col] = df[col].fillna("Unknown")
             categorical_imputed.append(col)
 
-    # --- Summary ---
+    # SUMMARY
     missing_after = df.isnull().sum().sum()
 
     print(f"[{dataset_name}]")
@@ -316,12 +322,12 @@ def handle_duplicates(
     df = df.copy()
     rows_before = len(df)
 
-    # --- Duplicados exatos ---
+    # Exact duplicates
     exact_before = len(df)
     df = df.drop_duplicates()
     exact_dropped = exact_before - len(df)
 
-    # --- Duplicados por chave ---
+    # Key duplicates
     key_dropped = 0
     if key_cols:
         existing_keys = [col for col in key_cols if col in df.columns]
@@ -335,7 +341,7 @@ def handle_duplicates(
             )
             key_dropped = (exact_before - exact_dropped) - len(df)
 
-    # --- Summary ---
+    # SUMMARY
     total_dropped = rows_before - len(df)
 
     print(f"[{dataset_name}]")
@@ -364,11 +370,11 @@ def drop_exact_duplicates(
     df = df.copy()
     rows_before = len(df)
 
-    # --- Exact duplicates ---
+    # Exact duplicates
     df = df.drop_duplicates()
     exact_dropped = rows_before - len(df)
 
-    # --- Summary ---
+    # SUMMARY
     print(f"[{dataset_name}]")
     print(f"  Rows before        : {rows_before}")
     print(f"  Exact duplicates   : {exact_dropped} dropped")
@@ -474,23 +480,28 @@ def detect_outliers(
     print()
 
 
+
+# SPECIFIC PER DATASET FUNCTIONS
 # -------------- BDOSS --------------------------------------------------------
 
-def _encode_risk(risk_series: pd.Series) -> pd.Series:
+def _encode_risk_ever(risk_series: pd.Series) -> pd.Series:
     """
     The RISK column is a 24-character string where each character represents
     a month in the past 24 months, and any digit != '0' signals a delinquency.
-    
-    Returns: 1 if at least one non-zero character exists, 0 otherwise.
 
-    Implementation: fully vectorized via regex - avoids slow row-by-row .apply().
+    Returns 1 if at least one non-zero character exists in the 24-char string, 0 otherwise.
     """
-    # Cast to string, strip whitespace, then flag any string that contains
-    # a character other than '0' (handles mixed int/str representations)
     s = risk_series.astype(str).str.strip()
-    # '0' or '0.0' (integer zero read as float) -> no risk
-    # any string with a non-zero digit -> risk
     has_nonzero = s.str.contains(r'[1-9]', regex=True, na=False)
+    return has_nonzero.astype(int)
+
+def _encode_risk_recent(risk_series: pd.Series) -> pd.Series:
+    """
+    Returns 1 if there's any non-zero character in the last 6 digits of the string (last 6 months), 0 otherwise.
+    """
+    s = risk_series.astype(str).str.strip()
+    s_last_6 = s.str[-6:]
+    has_nonzero = s_last_6.str.contains(r'[1-9]', regex=True, na=False)
     return has_nonzero.astype(int)
 
 
@@ -501,10 +512,7 @@ def clean_bdoss(df: pd.DataFrame) -> pd.DataFrame:
     Steps:
     1. Parse datetime columns.
     2. Encode the RISK target variable as binary (0 / 1).
-    3. Impute missing values in numeric columns.
-    4. Encode nominal categorical columns with one-hot encoding.
-    5. Derive time-based features (loan age, remaining months).
-    6. Drop raw datetime columns and high-leakage columns.
+    3. Drop raw datetime, ID, constant, and fully null columns.
 
     Returns:
     Cleaned DataFrame with CONTRIB and OBS_DATE retained as join keys.
@@ -517,11 +525,13 @@ def clean_bdoss(df: pd.DataFrame) -> pd.DataFrame:
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], errors="coerce")
 
-    # 2. ENCODE RISK (binary)
-    df["RISK"] = _encode_risk(df["RISK"])
+    # 2. ENCODE RISK VARIABLES
+    df["RISK_EVER"] = _encode_risk_ever(df["RISK"])
+    df["RISK_RECENT"] = _encode_risk_recent(df["RISK"])
+    df["RISK"] = pd.to_numeric(df["RISK"], errors="coerce").fillna(0).astype(int)
 
 
-    # 6. DROP RAW DATE COLS, ID COLS, EMPTY COLS AND CONSTANT COLS
+    # 3. DROP RAW DATE COLS, ID COLS, EMPTY COLS AND CONSTANT COLS
     # TYPEPROD has 1 unique value -> constant -> no predictive value
     # DOSSIER is loan-ID, not a feature
     # ACTIVIDADE_GLOBAL is 100% null in the source data -> drop
@@ -548,7 +558,9 @@ def clean_crc(df: pd.DataFrame) -> pd.DataFrame:
 
     - Parses OBS_DATE.
     - Fills COUNT_* and monetary columns with 0 (no record = no exposure).
-    - Imputes MT_MENSAL (monthly instalment total) with the global median.
+    - Note: Missing values in MT_MENSAL are NOT imputed here to avoid data leakage;
+      they are intentionally left as NaN so the downstream Pipeline (ClientImputer)
+      can safely impute them per-fold.
     """
     df = df.copy()
 
@@ -563,9 +575,10 @@ def clean_crc(df: pd.DataFrame) -> pd.DataFrame:
                       c.startswith("DIVIDAS_")]
     df[zero_fill_cols] = df[zero_fill_cols].fillna(0)
 
-    # MT_MENSAL: total monthly credit obligations – impute with median
+    # MT_MENSAL: total monthly credit obligations
+    # Missing values will flow to the ABT for safely imputed per fold by ClientImputer.
     if "MT_MENSAL" in df.columns:
-        df["MT_MENSAL"] = df["MT_MENSAL"].fillna(df["MT_MENSAL"].median())
+        pass
 
     # Derived: total overdue amount across product types
     montvenc_cols = [c for c in df.columns if c.startswith("MONTVENC_")]
@@ -628,6 +641,8 @@ def clean_fama(df: pd.DataFrame) -> pd.DataFrame:
     - Parses Date_Obs.
     - One-hot encodes sdem_SITFAM and sdem_HABITAT.
     - Keeps most-recent record per CONTRIB.
+    - Note: Numeric features are intentionally left with `NaN`s to avoid data
+      leakage. The downstream Pipeline (ClientImputer) will safely handle them.
     """
     df = df.copy()
 
@@ -651,11 +666,9 @@ def clean_fama(df: pd.DataFrame) -> pd.DataFrame:
     # Drop date column
     df.drop(columns=["Date_Obs"], inplace=True, errors="ignore")
 
-    # Numeric imputation for FAMA feature cols (fill with median)
-    num_cols = df.select_dtypes(include=[np.number]).columns
-    for col in num_cols:
-        if df[col].isnull().any():
-            df[col] = df[col].fillna(df[col].median())
+    # Numeric cols pass through. Missing values will be imputed by ClientImputer per CV fold
+    # to avoid data leakage.
+    pass
 
     print(f"[clean_fama] shape: {df.shape}")
     return df
@@ -666,7 +679,7 @@ def clean_fama(df: pd.DataFrame) -> pd.DataFrame:
 
 
 
-
+# I THINK WE CAN ERASE EVERYTHING FROM HERE, BUT PLEASE CONFIRM
 # -------------- MERGE --------------------------------------------------------
 
 def merge_datasets(
