@@ -330,7 +330,7 @@ def handle_duplicates(
     if key_cols:
         existing_keys = [col for col in key_cols if col in df.columns]
         if existing_keys:
-            # Para cada grupo de chave duplicada, manter a linha com menos missings
+            # For each group of duplicate keys, keep the row with the fewest missing values
             df["_missing_count"] = df.isnull().sum(axis=1)
             df = (
                 df.sort_values("_missing_count")
@@ -564,7 +564,6 @@ def clean_fama(df: pd.DataFrame) -> pd.DataFrame:
     Clean the FAMA customer-aggregated feature dataset.
 
     - Parses Date_Obs.
-    - One-hot encodes sdem_SITFAM and sdem_HABITAT.
     - Keeps most-recent record per CONTRIB.
     - Note: Numeric features are intentionally left with `NaN`s to avoid data
       leakage. The downstream Pipeline (ClientImputer) will safely handle them.
