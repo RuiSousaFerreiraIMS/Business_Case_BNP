@@ -459,10 +459,10 @@ def clean_bdoss(df: pd.DataFrame) -> pd.DataFrame:
 
     # 3. DROP RAW DATE COLS, ID COLS, EMPTY COLS AND CONSTANT COLS
     # TYPEPROD has 1 unique value -> constant -> no predictive value
-    # DOSSIER is loan-ID, not a feature
     # ACTIVIDADE_GLOBAL is 100% null in the source data -> drop
-    drop_cols = ["DCREAT", "DATFIN", "D1FIN", "DPOS", "DCSP",
-                 "DOSSIER", "ACTIVIDADE_GLOBAL"]
+
+    # TODO: These are not the Columns in the Excel - check again!
+    drop_cols = ["ACTIVIDADE_GLOBAL"]
     df.drop(columns=[c for c in drop_cols if c in df.columns], inplace=True)
 
     # Also drop any remaining columns that are 100% null
