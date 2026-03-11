@@ -10,7 +10,7 @@ sns.set_theme(style="whitegrid", palette="muted")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# DATA UNDERSTANDING (to use in 1.Data_Understanding.ipynb)
+# DATA UNDERSTANDING (to use in 1)Data_Understanding.ipynb)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def data_understanding_summary(df, dataset_name="Dataset"):
@@ -159,7 +159,7 @@ def visualize_by_variable(df, max_cat=10, dataset_name="Dataset"):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# GLOBAL DATA PREPARATION HELPERS (to use in 2.Data_Preparation.ipynb)
+# GLOBAL DATA PREPARATION HELPERS (to use in 2a)Data_Preparation.ipynb)
 
 # This section contains general-purpose functions for data cleaning and 
 # preparation that can be applied to any dataset without the risk of data leakage. 
