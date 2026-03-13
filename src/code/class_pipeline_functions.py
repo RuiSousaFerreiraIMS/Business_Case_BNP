@@ -215,6 +215,7 @@ class ClientOutlierHandler(BaseEstimator, TransformerMixin):
     def __init__(
         self,
         cols: list[str] | None = None,
+        exclude_cols: list[str] | None = None,
         methods: tuple = ("iqr", "mod_z"),
         min_votes: int = 2,
         iqr_k: float = 1.5,
@@ -224,6 +225,7 @@ class ClientOutlierHandler(BaseEstimator, TransformerMixin):
         verbose: bool = False,
     ):
         self.cols                   = cols
+        self.exclude_cols           = exclude_cols or []
         self.methods                = methods
         self.min_votes              = min_votes
         self.iqr_k                  = iqr_k
@@ -254,6 +256,10 @@ class ClientOutlierHandler(BaseEstimator, TransformerMixin):
             ]
         else:
             self.cols_ = [c for c in self.cols if c in df.columns]
+
+        # Remove explicitly excluded columns (e.g. discrete codes like CSP)
+        if self.exclude_cols:
+            self.cols_ = [c for c in self.cols_ if c not in self.exclude_cols]
 
         self.stats_ = {}
 
@@ -404,6 +410,11 @@ class ClientImputer(BaseEstimator, TransformerMixin):
         categorical_fill: str = "Unknown",
         verbose: bool = False,
     ):
+        # NOTE: ffill/bfill for datetime columns is row-order-dependent.
+        # After a shuffled train/test split, ffill fills from a random
+        # neighbor — not meaningful.  This is safe when no datetime cols
+        # are present (as in the current ABT), but should be revisited
+        # if raw date columns are ever passed through the pipeline.
         self.numeric_strategy  = numeric_strategy
         self.datetime_strategy = datetime_strategy
         self.categorical_fill  = categorical_fill
@@ -507,10 +518,6 @@ class ClientImputer(BaseEstimator, TransformerMixin):
         print()
 
 
-import numpy as np
-import pandas as pd
-from sklearn.base import BaseEstimator, TransformerMixin
-
 class ClientOneHotEncoder(BaseEstimator, TransformerMixin):
     """One-hot encodes designated categorical columns robustly.
     
@@ -550,6 +557,7 @@ class ClientOneHotEncoder(BaseEstimator, TransformerMixin):
         return self
         
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        check_is_fitted(self, "dummy_columns_")
         df = pd.DataFrame(X).copy()
         cols_to_transform = [c for c in self.cols if c in df.columns]
         
@@ -563,7 +571,11 @@ class ClientOneHotEncoder(BaseEstimator, TransformerMixin):
             # Align with columns learned during fit()
             # Missing columns are filled with 0, extra columns are dropped
             dummies = dummies.reindex(columns=self.dummy_columns_, fill_value=0)
-            
+
+            # Reset indices to prevent NaN rows from mismatched index alignment
+            df = df.reset_index(drop=True)
+            dummies = dummies.reset_index(drop=True)
+
             df = pd.concat([df, dummies], axis=1)
             df.drop(columns=cols_to_transform, inplace=True)
             
@@ -941,13 +953,3 @@ class ClientFeatureEngineer(BaseEstimator, TransformerMixin):
         for name in self.feature_names_created_:
             print(f"    + {name}")
         print()
-
-
-##TODO SCALING AND ENCODING
-
-
-
-
-
-
-
