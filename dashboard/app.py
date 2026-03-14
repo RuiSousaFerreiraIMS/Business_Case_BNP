@@ -227,6 +227,7 @@ if "page" not in st.session_state:
 if "selected_client" not in st.session_state:
     st.session_state.selected_client = None
 
+
 # ── Navbar ────────────────────────────────────────────────────────────────
 st.markdown("""
 <div class="navbar">
