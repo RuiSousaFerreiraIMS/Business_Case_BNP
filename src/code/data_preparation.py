@@ -437,8 +437,12 @@ def clean_bdoss(df: pd.DataFrame) -> pd.DataFrame:
 
     Steps:
     1. Parse datetime columns.
-    2. Encode the RISK target variable as binary (0 / 1).
-    3. Drop raw datetime, ID, constant, and fully null columns.
+    2. Drop fully-null columns.
+    3. Drop near-constant columns (>=95% same value).
+
+    Note: RISK is kept as a raw 24-char string. RISK_EVER and RISK_RECENT are
+    derived after customer-level aggregation (from LAST_RISK) to avoid computing
+    features on rows that are later discarded.
 
     Returns:
     Cleaned DataFrame with CONTRIB and OBS_DATE retained as join keys.
@@ -451,29 +455,25 @@ def clean_bdoss(df: pd.DataFrame) -> pd.DataFrame:
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], errors="coerce")
 
-    # 2. ENCODE RISK VARIABLES
-    df["RISK_EVER"] = _encode_risk_ever(df["RISK"])
-    df["RISK_RECENT"] = _encode_risk_recent(df["RISK"])
-    df["RISK"] = pd.to_numeric(df["RISK"], errors="coerce").fillna(0).astype(int)
-
-
-    # 3. DROP RAW DATE COLS, ID COLS, EMPTY COLS AND CONSTANT COLS
-    # TYPEPROD has 1 unique value -> constant -> no predictive value
-    # ACTIVIDADE_GLOBAL is 100% null in the source data -> drop
-
-    # TODO: These are not the Columns in the Excel - check again!
-    drop_cols = ["ACTIVIDADE_GLOBAL"]
-    df.drop(columns=[c for c in drop_cols if c in df.columns], inplace=True)
-
-    # Also drop any remaining columns that are 100% null
+    # 2. DROP FULLY-NULL COLUMNS
     all_null_cols = df.columns[df.isnull().mean() == 1.0].tolist()
     if all_null_cols:
         print(f"[clean_bdoss] Dropping {len(all_null_cols)} fully-null cols: {all_null_cols}")
         df.drop(columns=all_null_cols, inplace=True)
 
-    print(f"[clean_bdoss] shape: {df.shape} | "
-          f"RISK distribution:\n{df['RISK'].value_counts().to_dict()}")
+    # 3. DROP NEAR-CONSTANT COLUMNS (>=95% same value)
+    near_constant_cols = [
+        col for col in df.columns
+        if df[col].value_counts(normalize=True, dropna=False).iloc[0] >= 0.98
+    ]
+    if near_constant_cols:
+        print(f"[clean_bdoss] Dropping {len(near_constant_cols)} near-constant cols: {near_constant_cols}")
+        df.drop(columns=near_constant_cols, inplace=True)
+
+    print(f"[clean_bdoss] shape: {df.shape}")
     return df
+
+
 
 
 # -------------- CRC ----------------------------------------------------------
@@ -636,7 +636,6 @@ def merge_datasets(
     null_pct = (abt.isnull().sum().sum() / abt.size * 100).round(2)
     print(f"[merge] Final ABT shape: {abt.shape}")
     print(f"[merge] Overall missing: {null_pct}%")
-    print(f"[merge] RISK distribution:\n{abt['RISK'].value_counts().to_dict()}")
     return abt
 
 
