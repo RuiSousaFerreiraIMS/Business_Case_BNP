@@ -666,54 +666,54 @@ class ClientFeatureEngineer(BaseEstimator, TransformerMixin):
         # 1. CONTRACT MATURITY & REPAYMENT                                     #
         # ------------------------------------------------------------------ #
 
-        # Fraction of principal already repaid — clipped to [0, 1]
-        df["REPAYMENT_RATIO"] = (
-            (df["MTFINO"] - df["CRD"]) / df["MTFINO"].replace(0, np.nan)
-        ).clip(0, 1)
+        # Fraction of principal already repaid — clipped to [0, 1]  DATA LEAKAGE
+        #df["REPAYMENT_RATIO"] = (
+        #    (df["MTFINO"] - df["CRD"]) / df["MTFINO"].replace(0, np.nan)
+        #).clip(0, 1)
 
-        # How many months the contract has been active
-        df["CONTRACT_AGE_MONTHS"] = (
-            (pd.to_datetime(df["DPOS"]) - pd.to_datetime(df["DCREAT"])).dt.days / 30.44
-        ).clip(lower=0)
+        # How many months the contract has been active  DATA LEAKAGE
+        #df["CONTRACT_AGE_MONTHS"] = (
+            #(pd.to_datetime(df["DPOS"]) - pd.to_datetime(df["DCREAT"])).dt.days / 30.44
+        #).clip(lower=0)
 
-        # Estimated months remaining: current balance / monthly instalment
-        df["REMAINING_TERM_MONTHS"] = (
-            df["MTFIN"] / df["MENSALIDADE"].replace(0, np.nan)
-        ).clip(lower=0)
+        # Estimated months remaining: current balance / monthly instalment THIS IS NOT THE CURRENT REMAINING MONTHS
+        #df["REMAINING_TERM_MONTHS"] = (
+            #f["MTFIN"] / df["MENSALIDADE"].replace(0, np.nan)
+        #).clip(lower=0)
 
-        # Fraction of contract lifecycle elapsed (0 = just started, 1 = done)
-        total_term = df["CONTRACT_AGE_MONTHS"] + df["REMAINING_TERM_MONTHS"]
-        df["LIFECYCLE_RATIO"] = (
-            df["CONTRACT_AGE_MONTHS"] / total_term.replace(0, np.nan)
-        ).clip(0, 1)
+        # Fraction of contract lifecycle elapsed (0 = just started, 1 = done)  DATA LEAKAGE
+        #total_term = df["CONTRACT_AGE_MONTHS"] + df["REMAINING_TERM_MONTHS"]
+        #df["LIFECYCLE_RATIO"] = (
+            #df["CONTRACT_AGE_MONTHS"] / total_term.replace(0, np.nan)
+        #).clip(0, 1)
 
-        # Whether current instalment exceeds original (>1 = voluntary overpayment)
-        df["OVERPAYMENT_RATIO"] = (
-            df["MENSALIDADE_CORR"] / df["MENSALIDADE"].replace(0, np.nan)
-        ).clip(lower=0)
+        # Whether current instalment exceeds original (>1 = voluntary overpayment)  MENSALIDADE_CORR IS = MENSALIDADE
+        #df["OVERPAYMENT_RATIO"] = (
+            #df["MENSALIDADE_CORR"] / df["MENSALIDADE"].replace(0, np.nan)
+        #).clip(lower=0)
 
         # ------------------------------------------------------------------ #
         # 2. PAYMENT BEHAVIOUR                                                 #
         # ------------------------------------------------------------------ #
 
-        # Fraction of agreed regularisations paid
-        df["REGULARIZATION_COMPLETION"] = (
-            df["RANGPRO"] / df["DURDEG"].replace(0, np.nan)
-        ).clip(0, 1)
+        # Fraction of agreed regularisations paid  ONLY PERTIENENT WHEN EVALUATING CONTRACT BY CONTRACT
+        #df["REGULARIZATION_COMPLETION"] = (
+            #df["RANGPRO"] / df["DURDEG"].replace(0, np.nan)
+        #).clip(0, 1)
 
         # Payment delays normalised by contract age
-        df["DELAY_INTENSITY"] = (
-            df["RANGCLI"] / df["CONTRACT_AGE_MONTHS"].replace(0, np.nan)
-        ).clip(lower=0)
+        #df["DELAY_INTENSITY"] = (
+            #df["RANGCLI"] / df["CONTRACT_AGE_MONTHS"].replace(0, np.nan)
+        #).clip(lower=0)
 
         # Risk trend: positive = improving, negative = deteriorating
-        df["RISK_TREND_3M"] = df["RISK"].apply(self._compute_risk_trend)
+        #df["RISK_TREND_3M"] = df["RISK"].apply(self._compute_risk_trend)
 
         # Number of risk-level changes in last 12 months
-        df["RISK_VOLATILITY_12M"] = df["RISK"].apply(self._compute_risk_volatility)
+        #df["RISK_VOLATILITY_12M"] = df["RISK"].apply(self._compute_risk_volatility)
 
         # Consecutive months at current risk level
-        df["MONTHS_AT_CURRENT_RISK"] = df["RISK"].apply(self._compute_months_at_current_risk)
+        #df["MONTHS_AT_CURRENT_RISK"] = df["RISK"].apply(self._compute_months_at_current_risk)
 
         # ------------------------------------------------------------------ #
         # 3. FINANCIAL CAPACITY                                                #
