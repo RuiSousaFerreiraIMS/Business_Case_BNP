@@ -21,3 +21,5 @@ data/prepared/bdoss_customer.parquet
 data/prepared/crc_clean.parquet
 data/prepared/credscore_clean.parquet
 data/prepared/fama_clean.parquet
+/data/prepared/active_clients.parquet
+/data/prepared/active_clients_scored.parquet
