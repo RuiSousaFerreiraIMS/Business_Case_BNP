@@ -1,5 +1,5 @@
 """
-eda_functions.py  —  Cetelem Churn EDA
+eda_insights.py  —  Cetelem Churn EDA
 ======================================
 Functions are fully separated by target.
 
@@ -549,7 +549,7 @@ def san_5_demographics(df):
     ax.set_title("Early Settlement Rate by N Contracts\n"
                  "→ More contracts = more or less likely?", fontsize=9)
 
-    plt.subplots_adjust(left=0.25, top=0.93, bottom=0.07, right=0.95)
+    plt.tight_layout()
     plt.show()
 
 
@@ -1238,32 +1238,18 @@ def overview_compare(df):
     ax.set_title("Target Rate by MAX_RISKA\n"
                  "→ Does risk score predict churn more than early settlement?", fontsize=9)
 
-    # ── 3.1 Contract history: grouped bar both targets ──────────
+    # ── 4. RANGPRO: early settler vs churn KDE comparison ───────
     ax = axes[1, 1]
-    def _m(col, pos=True):
-        s = df[col]; return (s == 1) if pos else (s == 0)
-    combos = {
-        "Only SOL": (_m("EVER_SOL")  & _m("EVER_SAN", False) & _m("EVER_RBT", False)),
-        "Only SAN": (_m("EVER_SOL", False) & _m("EVER_SAN") & _m("EVER_RBT", False)),
-        "SOL+SAN":  (_m("EVER_SOL")  & _m("EVER_SAN")),
-        "Had RBT":  _m("EVER_RBT"),
-        "None":     (_m("EVER_SOL", False) & _m("EVER_SAN", False) & _m("EVER_RBT", False)),
-    }
-    labels_h = list(combos.keys())
-    rates_san   = [df.loc[v, TARGET_E].mean() * 100 for v in combos.values()]
-    rates_churn = [df.loc[v, TARGET_C].mean() * 100 for v in combos.values()]
-    x = np.arange(len(labels_h))
-    w = 0.38
-    ax.bar(x - w/2, rates_san,   w, color=C_SAT, alpha=0.85,
-           edgecolor="white", label="Early Settler")
-    ax.bar(x + w/2, rates_churn, w, color=C_CHR, alpha=0.85,
-           edgecolor="white", label="Churn")
-    ax.set_xticks(x)
-    ax.set_xticklabels(labels_h, fontsize=9)
-    ax.legend(fontsize=8)
-    _fmt_pct(ax)
-    ax.set_title("Target Rate by Contract History\n"
-                 "→ Clients with SOL history: loyal renewers or churners?", fontsize=9)
+    if "MEDIAN_RANGPRO" in df.columns:
+        _kde(ax, df.loc[df[TARGET_E] == 1, "MEDIAN_RANGPRO"], C_SAT, "Early Settler=1")
+        _kde(ax, df.loc[df[TARGET_C] == 1, "MEDIAN_RANGPRO"], C_CHR, "Churn=1")
+        _kde(ax, df.loc[(df[TARGET_E]==0) & (df[TARGET_C]==0), "MEDIAN_RANGPRO"],
+             C_NO, "Neither (control)")
+        ax.legend(fontsize=8)
+        ax.set_yticks([])
+        ax.set_xlabel("MEDIAN_RANGPRO")
+    ax.set_title("Product Risk Ranking (RANGPRO)\n"
+                 "→ Key separator for early settlement but not for churn?", fontsize=9)
 
     plt.tight_layout()
     plt.show()
