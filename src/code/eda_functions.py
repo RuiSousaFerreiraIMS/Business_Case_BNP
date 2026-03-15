@@ -1,5 +1,5 @@
 """
-eda_insights.py  —  Cetelem Churn EDA
+eda_functions.py  —  Cetelem Churn EDA
 ======================================
 Functions are fully separated by target.
 
@@ -9,7 +9,8 @@ san_1_distribution()     → class balance, profile, rate over time
 san_2_temporal()         → cohort, lifecycle stage, seasonality
 san_3_financial()        → loan size, income, DTI, stress indicators
 san_4_risk()             → LAST_RISK, MAX_RISKA, restructurings
-san_5_demographics()     → CSP, dependents, client history
+san_5_demographics()     → CSP, age, SITFAM, HABITAT, dependents, history
+san_6_external()         → external credit exposure (CRC + ALLBD)
 
 PART 2 — IS_CHURN
 ------------------
@@ -17,11 +18,13 @@ churn_1_distribution()   → class balance, profile, rate over time
 churn_2_temporal()       → cohort, lifecycle stage, seasonality
 churn_3_financial()      → loan size, income, DTI, stress indicators
 churn_4_risk()           → LAST_RISK, MAX_RISKA, restructurings
-churn_5_demographics()   → CSP, dependents, client history
+churn_5_demographics()   → CSP, age, SITFAM, HABITAT, dependents, history
+churn_6_external()       → external credit exposure (CRC + ALLBD)
 
 PART 3 — COMBINED OVERVIEW
 ----------------------------
 overview_bridge()        → 2x2 matrix + volume + profile comparison
+overview_compare()       → side-by-side comparison across key dimensions
 
 Usage
 -----
@@ -86,8 +89,30 @@ CSP_LABELS = {
     92: "Unemployed",
     96: "Fixed-term Contract",
     99: "Indeterminate",
+    56: "Other (56)",
 }
 
+
+SITFAM_LABELS = {
+    "C": "Married",
+    "D": "Divorced",
+    "F": "Other (F)",
+    "P": "Other (P)",
+    "S": "Single",
+    "U": "Cohabiting/Partnered",
+    "V": "Widowed",
+    "X": "Other/Unknown",
+}
+
+HABITAT_LABELS = {
+    "A": "Property Loan",
+    "E": "Employer Housing",
+    "F": "Family Home",
+    "L": "Tenant/Rental",
+    "O": "Other",
+    "P": "Owner",
+    "X": "Unknown",
+}
 
 def _fmt_pct(ax):
     ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f"{int(y)}"))
@@ -105,9 +130,9 @@ def _kde(ax, s, color, label):
     xs  = np.linspace(s.min(), s.max(), 300)
     ax.fill_between(xs, kde(xs), alpha=0.25, color=color)
     ax.plot(xs, kde(xs), color=color, lw=2,
-            label=f"{label}  (mean={s.mean():,.0f})")
+            label=f"{label}  (mean={s.mean():,.2f})" if s.mean() < 10 else f"{label}  (mean={s.mean():,.0f})")
 
-def _rate_bar(ax, series, target_series, title, top_n=10, highlight_color=C_SAT):
+def _rate_bar(ax, series, target_series, title, top_n=10, highlight_color=C_SAT, label_dict=None):
     """Horizontal bar: target rate per category, sorted descending."""
     grp = (pd.DataFrame({"cat": series, "t": target_series})
              .groupby("cat")["t"]
@@ -118,16 +143,60 @@ def _rate_bar(ax, series, target_series, title, top_n=10, highlight_color=C_SAT)
     grp["mean"] *= 100
     median = grp["mean"].median()
     colors = [highlight_color if v > median else "#78909C" for v in grp["mean"]]
+    
     # map numeric CSP codes to readable labels
     def _lbl(x):
-        try:
-            return CSP_LABELS.get(int(float(str(x))), str(x))
-        except:
-            return str(x)
+        s = str(x)
+        
+        # Handle NaN/None values
+        if s == 'nan' or s == 'None':
+            return 'Unknown'
+        
+        if label_dict:
+            # try as-is (string key)
+            if s in label_dict:
+                return label_dict[s]
+            # try as integer
+            try:
+                int_val = int(float(s))
+                if int_val in label_dict:
+                    return label_dict[int_val]
+            except (ValueError, TypeError):
+                pass
+        
+        # no label_dict: try all three maps
+        for d in [CSP_LABELS, SITFAM_LABELS, HABITAT_LABELS]:
+            if s in d:
+                return d[s]
+            try:
+                int_val = int(float(s))
+                if int_val in d:
+                    return d[int_val]
+            except (ValueError, TypeError):
+                pass
+        return s
+    
     y_labels = [_lbl(x) for x in grp.index]
-    ax.barh(y_labels, grp["mean"], color=colors, edgecolor="white")
-    for i, val in enumerate(grp["mean"]):
+    mean_values = grp["mean"].values
+    y_pos = np.arange(len(y_labels))
+    
+    # Draw bars
+    ax.barh(y_pos, mean_values, color=colors, edgecolor="white")
+    
+    # Remove default ticks and manually add labels as text
+    ax.set_yticks([])
+    
+    # Add labels as text on the left side of the plot
+    for i, label in enumerate(y_labels):
+        ax.text(-1.5, i, label, va="center", ha="right", fontsize=8)
+    
+    # Add percentage labels on bars
+    for i, val in enumerate(mean_values):
         ax.text(val + 0.2, i, f"{val:.1f}%", va="center", fontsize=8)
+    
+    # Set x-axis limits to make room for labels
+    ax.set_xlim(-2, mean_values.max() + 5)
+    
     _fmt_pct(ax)
     ax.set_title(title, fontsize=9)
 
@@ -230,9 +299,10 @@ def san_2_temporal(df):
                  fontsize=13, fontweight="bold")
 
     tmp = df.copy()
-    tmp["FIRST_DCREAT"] = pd.to_datetime(tmp["FIRST_DCREAT"], errors="coerce", dayfirst=True)
-    tmp["LAST_DPOS"]    = pd.to_datetime(tmp["LAST_DPOS"],    errors="coerce", dayfirst=True)
-    tmp["COHORT_Q"]     = tmp["FIRST_DCREAT"].dt.to_period("Q").astype(str)
+    tmp["LAST_DCREAT"]  = pd.to_datetime(tmp["LAST_DCREAT"], errors="coerce", dayfirst=True)
+    tmp["LAST_DPOS"]    = pd.to_datetime(tmp["LAST_DPOS"],   errors="coerce", dayfirst=True)
+    tmp["FIRST_DCREAT"] = pd.to_datetime(tmp["FIRST_DCREAT"],errors="coerce", dayfirst=True)
+    tmp["COHORT_Q"]     = tmp["LAST_DCREAT"].dt.to_period("Q").astype(str)
     tmp["OBS_MONTH"]    = tmp["LAST_DPOS"].dt.month
     tmp["CONTRACT_AGE_M"] = ((tmp["LAST_DPOS"] - tmp["FIRST_DCREAT"])
                               .dt.days / 30.44).clip(0)
@@ -259,7 +329,7 @@ def san_2_temporal(df):
     ax.set_xticklabels(grp.index[::step], rotation=45, ha="right", fontsize=7)
     _fmt_pct(ax)
     ax.set_ylabel("% Early Settler", fontsize=8)
-    ax.set_title("Early Settlement Rate by Origination Cohort\n"
+    ax.set_title("Early Settlement Rate by Contract Cohort (LAST_DCREAT)\n"
                  "→ Are certain cohorts more prone to early repayment?", fontsize=9)
     ax.set_zorder(ax2.get_zorder() + 1); ax.patch.set_visible(False)
 
@@ -272,10 +342,9 @@ def san_2_temporal(df):
                            include_lowest=True)
     grp = tmp.groupby("stage", observed=False)[T].agg(["mean", "count"])
     grp["mean"] *= 100
-    alphas = np.linspace(0.4, 1.0, len(grp))
+    stage_colors = ["#E53935", "#EF6C00", "#F9A825", "#43A047"]
     bars = ax.bar(grp.index.astype(str), grp["mean"],
-                  color=[(*plt.cm.colors.to_rgb(COL), a) for a in alphas],
-                  edgecolor="white", width=0.6)
+                  color=stage_colors, edgecolor="white", width=0.6)
     for bar, (_, row) in zip(bars, grp.iterrows()):
         ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.3,
                 f"{bar.get_height():.1f}%",
@@ -383,33 +452,27 @@ def san_4_risk(df):
     _rate_bar(ax, tmp["last_risk"], df[T],
               "Early Settlement Rate by Last Risk Code")
 
-    # ── 3. EVER_RBT ───────────────────────────────────────────
+    # ── 3. MEDIAN_RANGCLI ─────────────────────────────────────
     ax = axes[1, 0]
-    def _get(grp, k):
-        for key in [k, int(k), bool(k)]:
-            if key in grp.index: return grp[key]
-        return 0
-    grp = df.groupby("EVER_RBT")[T].mean() * 100
-    ax.bar(["Never restructured", "Ever restructured"],
-           [_get(grp, 0), _get(grp, 1)],
-           color=[C_NO, COL], edgecolor="white", width=0.5)
-    _fmt_pct(ax)
-    ax.set_title("Early Settlement Rate: Restructured vs Never", fontsize=9)
+    if "MEDIAN_RANGCLI" in df.columns:
+        _kde(ax, df.loc[df[T] == 0, "MEDIAN_RANGCLI"], C_NO,  "Settler=0")
+        _kde(ax, df.loc[df[T] == 1, "MEDIAN_RANGCLI"], COL,   "Settler=1")
+        ax.legend(fontsize=8)
+        ax.set_yticks([])
+        ax.set_xlabel("MEDIAN_RANGCLI")
+    ax.set_title("Client Risk Ranking (RANGCLI)\n"
+                 "→ Internal client risk score distribution", fontsize=9)
 
-    # ── 4. N_RBT distribution ─────────────────────────────────
+    # ── 4. MEDIAN_RANGPRO ─────────────────────────────────────
     ax = axes[1, 1]
-    for val, color, label in [
-        (0, C_NO, "Settler=0"), (1, COL, "Settler=1")
-    ]:
-        vc = (df[df[T] == val]["N_RBT"]
-                .value_counts().sort_index().head(3))
-        vc = vc / vc.sum() * 100
-        ax.plot(vc.index.astype(str), vc.values, "o-",
-                color=color, lw=2, ms=5, label=label)
-    ax.legend(fontsize=8)
-    _fmt_pct(ax)
-    ax.set_xlabel("N_RBT (number of restructurings)")
-    ax.set_title("Restructuring Count Distribution by Target", fontsize=9)
+    if "MEDIAN_RANGPRO" in df.columns:
+        _kde(ax, df.loc[df[T] == 0, "MEDIAN_RANGPRO"], C_NO,  "Settler=0")
+        _kde(ax, df.loc[df[T] == 1, "MEDIAN_RANGPRO"], COL,   "Settler=1")
+        ax.legend(fontsize=8)
+        ax.set_yticks([])
+        ax.set_xlabel("MEDIAN_RANGPRO")
+    ax.set_title("Product Risk Ranking (RANGPRO)\n"
+                 "→ Internal product risk score distribution", fontsize=9)
 
     plt.tight_layout()
     plt.show()
@@ -417,38 +480,65 @@ def san_4_risk(df):
 
 def san_5_demographics(df):
     """
-    1.5 — DEMOGRAPHICS & CLIENT HISTORY of early settlers.
-    CSP, dependents, contract count, loyalty profile.
+    1.5 — DEMOGRAPHICS of early settlers.
+    CSP, age, family situation, housing type, dependents.
     """
     T   = TARGET_E
     COL = C_SAT
 
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-    fig.suptitle("1.5  IS_EARLY_SETTLER — Demographics & Client History",
+    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+    fig.suptitle("1.5  IS_EARLY_SETTLER — Demographics",
                  fontsize=13, fontweight="bold")
 
-    top_csp = df["CSP"].value_counts().head(10).index
-    tmp = df[df["CSP"].isin(top_csp)].copy()
-
     # ── 1. CSP rate ───────────────────────────────────────────
-    _rate_bar(axes[0, 0], tmp["CSP"], tmp[T],
+    top_csp = df["CSP"].value_counts().head(10).index
+    tmp_csp = df[df["CSP"].isin(top_csp)]
+    _rate_bar(axes[0, 0], tmp_csp["CSP"], tmp_csp[T],
               "Early Settlement Rate by CSP (top 10)\n"
-              "→ Which professions settle early most?")
+              "→ Which professions settle early most?",
+              label_dict=CSP_LABELS)
 
-    # ── 2. NBENF ──────────────────────────────────────────────
+    # ── 2. Age KDE ────────────────────────────────────────────
     ax = axes[0, 1]
+    if "sdem_age" in df.columns:
+        _kde(ax, df.loc[df[T] == 0, "sdem_age"], C_NO,  "Settler=0")
+        _kde(ax, df.loc[df[T] == 1, "sdem_age"], COL,   "Settler=1")
+        ax.legend(fontsize=8)
+        ax.set_yticks([])
+        ax.set_xlabel("Age")
+    ax.set_title("Age Distribution\n→ Do younger clients settle earlier?", fontsize=9)
+
+    # ── 3. SITFAM ─────────────────────────────────────────────
+    if "sdem_SITFAM" in df.columns:
+        _rate_bar(axes[0, 2], df["sdem_SITFAM"], df[T],
+                  "Early Settlement Rate by Family Situation\n"
+                  "→ Single vs married vs other?",
+                  highlight_color=COL, label_dict=SITFAM_LABELS)
+    else:
+        axes[0, 2].set_visible(False)
+
+    # ── 4. HABITAT ────────────────────────────────────────────
+    if "sdem_HABITAT" in df.columns:
+        _rate_bar(axes[1, 0], df["sdem_HABITAT"], df[T],
+                  "Early Settlement Rate by Housing Type\n"
+                  "→ Homeowners vs renters?",
+                  highlight_color=COL, label_dict=HABITAT_LABELS)
+    else:
+        axes[1, 0].set_visible(False)
+
+    # ── 5. NBENF ──────────────────────────────────────────────
+    ax = axes[1, 1]
     grp = df.groupby("NBENF")[T].agg(["mean", "count"])
     grp = grp[grp["count"] >= 20]
     grp["mean"] *= 100
     grp.index = grp.index.map(lambda x: str(int(float(x))) if str(x) != 'nan' else x)
-    ax.bar(grp.index, grp["mean"],
-           color=COL, alpha=0.8, edgecolor="white")
+    ax.bar(grp.index, grp["mean"], color=COL, alpha=0.8, edgecolor="white")
     _fmt_pct(ax)
     ax.set_xlabel("NBENF (dependents)")
-    ax.set_title("Early Settlement Rate by Number of Dependents", fontsize=9)
+    ax.set_title("Early Settlement Rate by Dependents", fontsize=9)
 
-    # ── 3. N_CONTRACTS ────────────────────────────────────────
-    ax = axes[1, 0]
+    # ── 6. N_CONTRACTS ────────────────────────────────────────
+    ax = axes[1, 2]
     grp = df.groupby("N_CONTRACTS")[T].agg(["mean", "count"])
     grp = grp[grp["count"] >= 20]
     grp["mean"] *= 100
@@ -456,32 +546,77 @@ def san_5_demographics(df):
            color=COL, alpha=0.8, edgecolor="white")
     _fmt_pct(ax)
     ax.set_xlabel("N_CONTRACTS")
-    ax.set_title("Early Settlement Rate by Number of Contracts\n"
-                 "→ More contracts = more or less likely to settle early?", fontsize=9)
+    ax.set_title("Early Settlement Rate by N Contracts\n"
+                 "→ More contracts = more or less likely?", fontsize=9)
 
-    # ── 4. History profile ────────────────────────────────────
-    ax = axes[1, 1]
-    def _m(col, pos=True):
-        s = df[col]
-        return (s == 1) if pos else (s == 0)
-    combos = {
-        "Only SOL":  (_m("EVER_SOL")  & _m("EVER_SAN",False) & _m("EVER_RBT",False)),
-        "Only SAN":  (_m("EVER_SOL",False) & _m("EVER_SAN") & _m("EVER_RBT",False)),
-        "SOL+SAN":   (_m("EVER_SOL")  & _m("EVER_SAN")),
-        "Had RBT":   _m("EVER_RBT"),
-        "None":      (_m("EVER_SOL",False) & _m("EVER_SAN",False) & _m("EVER_RBT",False)),
+    plt.subplots_adjust(left=0.25, top=0.93, bottom=0.07, right=0.95)
+    plt.show()
+
+
+def san_6_external(df):
+    """
+    1.6 — EXTERNAL CREDIT EXPOSURE of early settlers.
+    CRC data: credit counts, outstanding amounts, debt by type, BNP relationship.
+    """
+    T   = TARGET_E
+    COL = C_SAT
+
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    fig.suptitle("1.6  IS_EARLY_SETTLER — External Credit Exposure (CRC)",
+                 fontsize=13, fontweight="bold")
+
+    # ── 1. Total external credit count ───────────────────────
+    ax = axes[0, 0]
+    if "COUNT_TOTAL_MEDIAN" in df.columns:
+        _kde(ax, df.loc[df[T] == 0, "COUNT_TOTAL_MEDIAN"], C_NO, "Settler=0")
+        _kde(ax, df.loc[df[T] == 1, "COUNT_TOTAL_MEDIAN"], COL, "Settler=1")
+        ax.legend(fontsize=8)
+        ax.set_yticks([])
+        ax.set_xlabel("Median total active credits (BdP)")
+    ax.set_title("External Credit Count\n→ Do early settlers have more credits elsewhere?", fontsize=9)
+
+    # ── 2. Monthly payment to BdP ────────────────────────────
+    ax = axes[0, 1]
+    if "MT_MENSAL_MEDIAN" in df.columns:
+        _kde(ax, df.loc[df[T] == 0, "MT_MENSAL_MEDIAN"], C_NO, "Settler=0")
+        _kde(ax, df.loc[df[T] == 1, "MT_MENSAL_MEDIAN"], COL, "Settler=1")
+        ax.legend(fontsize=8)
+        ax.set_yticks([])
+        ax.set_xlabel("Median monthly payment to BdP (EUR)")
+    ax.set_title("Total Monthly Credit Burden (BdP)\n→ More financially committed externally?", fontsize=9)
+
+    # ── 3. Debt by type: CL, CP, AUTO, HT ───────────────────
+    ax = axes[1, 0]
+    debt_cols = {
+        "Consumer (CL)": "DIVIDAS_CL_MEDIAN",
+        "Personal (CP)": "DIVIDAS_CP_MEDIAN",
+        "Auto":          "DIVIDAS_AUTO_MEDIAN",
+        "Mortgage (HT)": "DIVIDAS_HT_MEDIAN",
     }
-    rates = {k: df.loc[v, T].mean() * 100 for k, v in combos.items() if v.sum() >= 20}
-    ns    = {k: v.sum() for k, v in combos.items()}
-    vals  = list(rates.values())
-    ax.barh(list(rates.keys()), vals,
-            color=[COL if v > np.mean(vals) else C_NO for v in vals],
-            edgecolor="white")
-    for i, (v, lbl) in enumerate(zip(vals, rates.keys())):
-        ax.text(v + 0.2, i, f"{v:.1f}%",
-                va="center", fontsize=8)
-    _fmt_pct(ax)
-    ax.set_title("Early Settlement Rate by Contract History Profile", fontsize=9)
+    debt_cols = {k: v for k, v in debt_cols.items() if v in df.columns}
+    if debt_cols:
+        x = np.arange(len(debt_cols))
+        w = 0.38
+        means0 = [df.loc[df[T] == 0, c].median() for c in debt_cols.values()]
+        means1 = [df.loc[df[T] == 1, c].median() for c in debt_cols.values()]
+        ax.bar(x - w/2, means0, w, color=C_NO,  edgecolor="white", label="Settler=0")
+        ax.bar(x + w/2, means1, w, color=COL, edgecolor="white", label="Settler=1")
+        ax.set_xticks(x)
+        ax.set_xticklabels(list(debt_cols.keys()), fontsize=9)
+        ax.legend(fontsize=8)
+        ax.set_ylabel("Median outstanding debt (EUR)")
+    ax.set_title("External Debt by Credit Type\n→ Where is their debt concentrated?", fontsize=9)
+
+    # ── 4. BNP group events ───────────────────────────────────
+    ax = axes[1, 1]
+    if "ALLBD_N_events__N" in df.columns:
+        _kde(ax, df.loc[df[T] == 0, "ALLBD_N_events__N"], C_NO, "Settler=0")
+        _kde(ax, df.loc[df[T] == 1, "ALLBD_N_events__N"], COL,  "Settler=1")
+        ax.legend(fontsize=8)
+        ax.set_yticks([])
+        ax.set_xlabel("N events within BNP Group")
+    ax.set_title("BNP Group Activity (ALLBD_N_events)\n"
+                 "→ More active clients within the group settle early?", fontsize=9)
 
     plt.tight_layout()
     plt.show()
@@ -585,9 +720,10 @@ def churn_2_temporal(df):
                  fontsize=13, fontweight="bold")
 
     tmp = df.copy()
-    tmp["FIRST_DCREAT"] = pd.to_datetime(tmp["FIRST_DCREAT"], errors="coerce", dayfirst=True)
-    tmp["LAST_DPOS"]    = pd.to_datetime(tmp["LAST_DPOS"],    errors="coerce", dayfirst=True)
-    tmp["COHORT_Q"]     = tmp["FIRST_DCREAT"].dt.to_period("Q").astype(str)
+    tmp["LAST_DCREAT"]  = pd.to_datetime(tmp["LAST_DCREAT"], errors="coerce", dayfirst=True)
+    tmp["LAST_DPOS"]    = pd.to_datetime(tmp["LAST_DPOS"],   errors="coerce", dayfirst=True)
+    tmp["FIRST_DCREAT"] = pd.to_datetime(tmp["FIRST_DCREAT"],errors="coerce", dayfirst=True)
+    tmp["COHORT_Q"]     = tmp["LAST_DCREAT"].dt.to_period("Q").astype(str)
     tmp["OBS_MONTH"]    = tmp["LAST_DPOS"].dt.month
     tmp["CONTRACT_AGE_M"] = ((tmp["LAST_DPOS"] - tmp["FIRST_DCREAT"])
                               .dt.days / 30.44).clip(0)
@@ -614,7 +750,7 @@ def churn_2_temporal(df):
     ax.set_xticklabels(grp.index[::step], rotation=45, ha="right", fontsize=7)
     _fmt_pct(ax)
     ax.set_ylabel("% Churn", fontsize=8)
-    ax.set_title("Churn Rate by Origination Cohort\n"
+    ax.set_title("Churn Rate by Contract Cohort (LAST_DCREAT)\n"
                  "→ Is the book deteriorating?", fontsize=9)
     ax.set_zorder(ax2.get_zorder() + 1); ax.patch.set_visible(False)
 
@@ -736,33 +872,27 @@ def churn_4_risk(df):
     _rate_bar(ax, tmp["last_risk"], df[T],
               "Churn Rate by Last Risk Code", highlight_color=C_CHR)
 
-    # ── 3. EVER_RBT ───────────────────────────────────────────
+    # ── 3. MEDIAN_RANGCLI ─────────────────────────────────────
     ax = axes[1, 0]
-    def _get(grp, k):
-        for key in [k, int(k), bool(k)]:
-            if key in grp.index: return grp[key]
-        return 0
-    grp = df.groupby("EVER_RBT")[T].mean() * 100
-    ax.bar(["Never restructured", "Ever restructured"],
-           [_get(grp, 0), _get(grp, 1)],
-           color=[C_NO, COL], edgecolor="white", width=0.5)
-    _fmt_pct(ax)
-    ax.set_title("Churn Rate: Restructured vs Never", fontsize=9)
+    if "MEDIAN_RANGCLI" in df.columns:
+        _kde(ax, df.loc[df[T] == 0, "MEDIAN_RANGCLI"], C_NO,  "Churn=0")
+        _kde(ax, df.loc[df[T] == 1, "MEDIAN_RANGCLI"], COL,   "Churn=1")
+        ax.legend(fontsize=8)
+        ax.set_yticks([])
+        ax.set_xlabel("MEDIAN_RANGCLI")
+    ax.set_title("Client Risk Ranking (RANGCLI)\n"
+                 "→ Internal client risk score distribution", fontsize=9)
 
-    # ── 4. N_RBT distribution ─────────────────────────────────
+    # ── 4. MEDIAN_RANGPRO ─────────────────────────────────────
     ax = axes[1, 1]
-    for val, color, label in [
-        (0, C_NO, "Churn=0"), (1, COL, "Churn=1")
-    ]:
-        vc = (df[df[T] == val]["N_RBT"]
-                .value_counts().sort_index().head(3))
-        vc = vc / vc.sum() * 100
-        ax.plot(vc.index.astype(str), vc.values, "o-",
-                color=color, lw=2, ms=5, label=label)
-    ax.legend(fontsize=8)
-    _fmt_pct(ax)
-    ax.set_xlabel("N_RBT (number of restructurings)")
-    ax.set_title("Restructuring Count Distribution by Churn Status", fontsize=9)
+    if "MEDIAN_RANGPRO" in df.columns:
+        _kde(ax, df.loc[df[T] == 0, "MEDIAN_RANGPRO"], C_NO,  "Churn=0")
+        _kde(ax, df.loc[df[T] == 1, "MEDIAN_RANGPRO"], COL,   "Churn=1")
+        ax.legend(fontsize=8)
+        ax.set_yticks([])
+        ax.set_xlabel("MEDIAN_RANGPRO")
+    ax.set_title("Product Risk Ranking (RANGPRO)\n"
+                 "→ Internal product risk score distribution", fontsize=9)
 
     plt.tight_layout()
     plt.show()
@@ -770,38 +900,65 @@ def churn_4_risk(df):
 
 def churn_5_demographics(df):
     """
-    2.5 — DEMOGRAPHICS & CLIENT HISTORY of churners.
-    CSP, dependents, contract count, loyalty profile.
+    2.5 — DEMOGRAPHICS of churners.
+    CSP, age, family situation, housing type, dependents.
     """
     T   = TARGET_C
     COL = C_CHR
 
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-    fig.suptitle("2.5  IS_CHURN — Demographics & Client History",
+    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+    fig.suptitle("2.5  IS_CHURN — Demographics",
                  fontsize=13, fontweight="bold")
 
-    top_csp = df["CSP"].value_counts().head(10).index
-    tmp = df[df["CSP"].isin(top_csp)].copy()
-
     # ── 1. CSP churn rate ─────────────────────────────────────
-    _rate_bar(axes[0, 0], tmp["CSP"], tmp[T],
+    top_csp = df["CSP"].value_counts().head(10).index
+    tmp_csp = df[df["CSP"].isin(top_csp)]
+    _rate_bar(axes[0, 0], tmp_csp["CSP"], tmp_csp[T],
               "Churn Rate by CSP (top 10)\n"
-              "→ Which professions churn most?", highlight_color=C_CHR)
+              "→ Which professions churn most?",
+              highlight_color=COL, label_dict=CSP_LABELS)
 
-    # ── 2. NBENF ──────────────────────────────────────────────
+    # ── 2. Age KDE ────────────────────────────────────────────
     ax = axes[0, 1]
+    if "sdem_age" in df.columns:
+        _kde(ax, df.loc[df[T] == 0, "sdem_age"], C_NO, "Churn=0")
+        _kde(ax, df.loc[df[T] == 1, "sdem_age"], COL,  "Churn=1")
+        ax.legend(fontsize=8)
+        ax.set_yticks([])
+        ax.set_xlabel("Age")
+    ax.set_title("Age Distribution\n→ Do younger clients churn more?", fontsize=9)
+
+    # ── 3. SITFAM ─────────────────────────────────────────────
+    if "sdem_SITFAM" in df.columns:
+        _rate_bar(axes[0, 2], df["sdem_SITFAM"], df[T],
+                  "Churn Rate by Family Situation\n"
+                  "→ Single vs married vs other?",
+                  highlight_color=COL, label_dict=SITFAM_LABELS)
+    else:
+        axes[0, 2].set_visible(False)
+
+    # ── 4. HABITAT ────────────────────────────────────────────
+    if "sdem_HABITAT" in df.columns:
+        _rate_bar(axes[1, 0], df["sdem_HABITAT"], df[T],
+                  "Churn Rate by Housing Type\n"
+                  "→ Homeowners vs renters?",
+                  highlight_color=COL, label_dict=HABITAT_LABELS)
+    else:
+        axes[1, 0].set_visible(False)
+
+    # ── 5. NBENF ──────────────────────────────────────────────
+    ax = axes[1, 1]
     grp = df.groupby("NBENF")[T].agg(["mean", "count"])
     grp = grp[grp["count"] >= 20]
     grp["mean"] *= 100
     grp.index = grp.index.map(lambda x: str(int(float(x))) if str(x) != 'nan' else x)
-    ax.bar(grp.index, grp["mean"],
-           color=COL, alpha=0.8, edgecolor="white")
+    ax.bar(grp.index, grp["mean"], color=COL, alpha=0.8, edgecolor="white")
     _fmt_pct(ax)
     ax.set_xlabel("NBENF (dependents)")
-    ax.set_title("Churn Rate by Number of Dependents", fontsize=9)
+    ax.set_title("Churn Rate by Dependents", fontsize=9)
 
-    # ── 3. N_CONTRACTS ────────────────────────────────────────
-    ax = axes[1, 0]
+    # ── 6. N_CONTRACTS ────────────────────────────────────────
+    ax = axes[1, 2]
     grp = df.groupby("N_CONTRACTS")[T].agg(["mean", "count"])
     grp = grp[grp["count"] >= 20]
     grp["mean"] *= 100
@@ -809,32 +966,77 @@ def churn_5_demographics(df):
            color=COL, alpha=0.8, edgecolor="white")
     _fmt_pct(ax)
     ax.set_xlabel("N_CONTRACTS")
-    ax.set_title("Churn Rate by Number of Contracts\n"
+    ax.set_title("Churn Rate by N Contracts\n"
                  "→ Multi-contract clients: more loyal or higher risk?", fontsize=9)
 
-    # ── 4. History profile × churn ────────────────────────────
-    ax = axes[1, 1]
-    def _m(col, pos=True):
-        s = df[col]
-        return (s == 1) if pos else (s == 0)
-    combos = {
-        "Only SOL":  (_m("EVER_SOL")  & _m("EVER_SAN",False) & _m("EVER_RBT",False)),
-        "Only SAN":  (_m("EVER_SOL",False) & _m("EVER_SAN") & _m("EVER_RBT",False)),
-        "SOL+SAN":   (_m("EVER_SOL")  & _m("EVER_SAN")),
-        "Had RBT":   _m("EVER_RBT"),
-        "None":      (_m("EVER_SOL",False) & _m("EVER_SAN",False) & _m("EVER_RBT",False)),
+    plt.tight_layout()
+    plt.show()
+
+
+def churn_6_external(df):
+    """
+    2.6 — EXTERNAL CREDIT EXPOSURE of churners.
+    CRC data: credit counts, outstanding amounts, debt by type, BNP relationship.
+    """
+    T   = TARGET_C
+    COL = C_CHR
+
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    fig.suptitle("2.6  IS_CHURN — External Credit Exposure (CRC)",
+                 fontsize=13, fontweight="bold")
+
+    # ── 1. Total external credit count ───────────────────────
+    ax = axes[0, 0]
+    if "COUNT_TOTAL_MEDIAN" in df.columns:
+        _kde(ax, df.loc[df[T] == 0, "COUNT_TOTAL_MEDIAN"], C_NO, "Churn=0")
+        _kde(ax, df.loc[df[T] == 1, "COUNT_TOTAL_MEDIAN"], COL,  "Churn=1")
+        ax.legend(fontsize=8)
+        ax.set_yticks([])
+        ax.set_xlabel("Median total active credits (BdP)")
+    ax.set_title("External Credit Count\n→ Do churners have more credits elsewhere?", fontsize=9)
+
+    # ── 2. Monthly payment to BdP ────────────────────────────
+    ax = axes[0, 1]
+    if "MT_MENSAL_MEDIAN" in df.columns:
+        _kde(ax, df.loc[df[T] == 0, "MT_MENSAL_MEDIAN"], C_NO, "Churn=0")
+        _kde(ax, df.loc[df[T] == 1, "MT_MENSAL_MEDIAN"], COL,  "Churn=1")
+        ax.legend(fontsize=8)
+        ax.set_yticks([])
+        ax.set_xlabel("Median monthly payment to BdP (EUR)")
+    ax.set_title("Total Monthly Credit Burden (BdP)\n→ Are churners more financially stretched?", fontsize=9)
+
+    # ── 3. Debt by type ───────────────────────────────────────
+    ax = axes[1, 0]
+    debt_cols = {
+        "Consumer (CL)": "DIVIDAS_CL_MEDIAN",
+        "Personal (CP)": "DIVIDAS_CP_MEDIAN",
+        "Auto":          "DIVIDAS_AUTO_MEDIAN",
+        "Mortgage (HT)": "DIVIDAS_HT_MEDIAN",
     }
-    rates = {k: df.loc[v, T].mean() * 100 for k, v in combos.items() if v.sum() >= 20}
-    ns    = {k: v.sum() for k, v in combos.items()}
-    vals  = list(rates.values())
-    ax.barh(list(rates.keys()), vals,
-            color=[COL if v > np.mean(vals) else C_NO for v in vals],
-            edgecolor="white")
-    for i, (v, lbl) in enumerate(zip(vals, rates.keys())):
-        ax.text(v + 0.2, i, f"{v:.1f}%",
-                va="center", fontsize=8)
-    _fmt_pct(ax)
-    ax.set_title("Churn Rate by Contract History Profile", fontsize=9)
+    debt_cols = {k: v for k, v in debt_cols.items() if v in df.columns}
+    if debt_cols:
+        x = np.arange(len(debt_cols))
+        w = 0.38
+        means0 = [df.loc[df[T] == 0, c].median() for c in debt_cols.values()]
+        means1 = [df.loc[df[T] == 1, c].median() for c in debt_cols.values()]
+        ax.bar(x - w/2, means0, w, color=C_NO,  edgecolor="white", label="Churn=0")
+        ax.bar(x + w/2, means1, w, color=COL, edgecolor="white", label="Churn=1")
+        ax.set_xticks(x)
+        ax.set_xticklabels(list(debt_cols.keys()), fontsize=9)
+        ax.legend(fontsize=8)
+        ax.set_ylabel("Median outstanding debt (EUR)")
+    ax.set_title("External Debt by Credit Type\n→ Where is churners' debt concentrated?", fontsize=9)
+
+    # ── 4. BNP group events ───────────────────────────────────
+    ax = axes[1, 1]
+    if "ALLBD_N_events__N" in df.columns:
+        _kde(ax, df.loc[df[T] == 0, "ALLBD_N_events__N"], C_NO, "Churn=0")
+        _kde(ax, df.loc[df[T] == 1, "ALLBD_N_events__N"], COL,  "Churn=1")
+        ax.legend(fontsize=8)
+        ax.set_yticks([])
+        ax.set_xlabel("N events within BNP Group")
+    ax.set_title("BNP Group Activity (ALLBD_N_events)\n"
+                 "→ More active clients within the group churn less?", fontsize=9)
 
     plt.tight_layout()
     plt.show()
@@ -884,23 +1086,26 @@ def overview_bridge(df):
     ax.set_title("Volume per Outcome Quadrant", fontsize=10)
     plt.setp(ax.get_xticklabels(), fontsize=8)
 
-    # ── 2x2 heatmap ───────────────────────────────────────────
+    # ── 2x2 heatmap — fixed colors per quadrant ──────────────
     ax = axes[1]
-    matrix = np.array([[q["san_renewed"], q["san_churned"]],
-                        [q["mat_renewed"], q["mat_churned"]]])
-    annot  = np.array([
+    # cell colors match QUAD dict exactly
+    cell_colors = [
+        ["#1B5E20", "#B71C1C"],   # SAN=1: renewed=green, churned=red
+        ["#1565C0", "#E65100"],   # SAN=0: renewed=blue,  churned=orange
+    ]
+    cell_annot = [
         [f"{q['san_renewed']:,}\n({q['san_renewed']/N*100:.1f}%)",
          f"{q['san_churned']:,}\n({q['san_churned']/N*100:.1f}%)"],
         [f"{q['mat_renewed']:,}\n({q['mat_renewed']/N*100:.1f}%)",
          f"{q['mat_churned']:,}\n({q['mat_churned']/N*100:.1f}%)"],
-    ])
-    ax.imshow(matrix, cmap="RdYlGn", vmin=0, aspect="auto")
+    ]
     for i in range(2):
         for j in range(2):
-            ax.text(j, i, annot[i, j], ha="center", va="center",
-                    fontsize=12, fontweight="bold", color="white",
-                    bbox=dict(boxstyle="round,pad=0.2",
-                              fc="black", alpha=0.3, ec="none"))
+            ax.add_patch(plt.Rectangle((j-0.5, i-0.5), 1, 1,
+                         color=cell_colors[i][j], zorder=1))
+            ax.text(j, i, cell_annot[i][j], ha="center", va="center",
+                    fontsize=12, fontweight="bold", color="white", zorder=2)
+    ax.set_xlim(-0.5, 1.5); ax.set_ylim(-0.5, 1.5)
     ax.set_xticks([0, 1]); ax.set_yticks([0, 1])
     ax.set_xticklabels(["Churn=0\n(Renewed)", "Churn=1\n(Left)"])
     ax.set_yticklabels(["SAN=1\n(Early Settler)", "SAN=0\n(Maturity)"])
@@ -915,6 +1120,7 @@ def overview_bridge(df):
                 (0,0): "Mat+Renewed", (0,1): "Mat+Churned"}
     quad_colors = {"SAN+Renewed": "#1B5E20", "SAN+Churned": "#B71C1C",
                    "Mat+Renewed": "#1565C0", "Mat+Churned": "#E65100"}
+    # consistent with QUAD color dict above
     tmp2 = df[[TARGET_E, TARGET_C] + profile_cols].dropna(
         subset=[TARGET_E, TARGET_C]).copy()
     tmp2["quadrant"] = [quad_map.get((int(e), int(c)), None)
@@ -987,8 +1193,11 @@ def overview_compare(df):
             edgecolor="white", label="Early Settler")
     ax.barh(x + w/2, csp_churn.reindex(order).values, w, color=C_CHR, alpha=0.85,
             edgecolor="white", label="Churn")
-    ax.set_yticks(x)
-    ax.set_yticklabels(y_labels, fontsize=8)
+    ax.set_yticks([])
+    for i, label in enumerate(y_labels):
+        ax.text(-1.5, i, label, va="center", ha="right", fontsize=8)
+    max_val = max(csp_san.reindex(order).max(), csp_churn.reindex(order).max())
+    ax.set_xlim(-2, max_val + 5)
     ax.legend(fontsize=8)
     _fmt_pct(ax)
     ax.set_title("Early Settlement vs Churn Rate by CSP\n"
@@ -1058,4 +1267,3 @@ def overview_compare(df):
 
     plt.tight_layout()
     plt.show()
-

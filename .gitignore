@@ -23,3 +23,4 @@ data/prepared/credscore_clean.parquet
 data/prepared/fama_clean.parquet
 /data/prepared/active_clients.parquet
 /data/prepared/active_clients_scored.parquet
+data/prepared/EDA_with_FE.parquet

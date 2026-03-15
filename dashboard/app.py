@@ -27,7 +27,7 @@ html, body, [class*="css"], .stApp {
     padding-left: 0 !important;
     padding-right: 0 !important;
     padding-bottom: 3rem !important;
-    max-width: 100% !important;
+    max-width: 90% !important;
 }
 
 /* ── Navbar ── */
