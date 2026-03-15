@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.base import BaseEstimator, TransformerMixin, clone
 from sklearn.utils.validation import check_is_fitted
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
@@ -12,8 +12,12 @@ from sklearn.preprocessing import (
     OneHotEncoder,
     OrdinalEncoder,
     FunctionTransformer,
+    TargetEncoder
 )
-from sklearn.preprocessing import TargetEncoder
+from collections import Counter
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_selection import RFE
 
 
 
@@ -146,8 +150,8 @@ class ClientDataCleaner(BaseEstimator, TransformerMixin):
         """
         print("[ClientDataCleaner]")
         print(f"  Output shape     : {df.shape}")
-        print(f"  Columns removed  : {self.report_['removed_cols'] or '—'}")
-        print(f"  Dates converted  : {self.report_['converted_dates'] or '—'}")
+        print(f"  Columns removed  : {self.report_['removed_cols'] or '-'}")
+        print(f"  Dates converted  : {self.report_['converted_dates'] or '-'}")
 
         if self.report_["numeric_new_nans"]:
             print("  Numeric new NaNs :")
@@ -176,9 +180,9 @@ class ClientOutlierHandler(BaseEstimator, TransformerMixin):
     Rows are never dropped.
 
     Supported detection methods:
-        - 'iqr'   : Tukey fences — flags values below Q1 - k*IQR or
+        - 'iqr'   : Tukey fences - flags values below Q1 - k*IQR or
                     above Q3 + k*IQR.
-        - 'mod_z' : Modified Z-score using median and MAD — more robust
+        - 'mod_z' : Modified Z-score using median and MAD - more robust
                     than standard Z-score for skewed distributions like
                     income or loan amounts.
 
@@ -188,7 +192,7 @@ class ClientOutlierHandler(BaseEstimator, TransformerMixin):
         methods: Detection methods to use. Any combination of 'iqr'
             and 'mod_z'.
         min_votes: Number of methods that must agree to flag a value.
-            With 2 methods, setting min_votes=2 means both must agree —
+            With 2 methods, setting min_votes=2 means both must agree -
             recommended to avoid removing legitimate extreme clients.
         iqr_k: Multiplier for the IQR fence. Standard is 1.5. Increase
             to 2.0-2.5 to be more conservative with tree-based models.
@@ -249,7 +253,7 @@ class ClientOutlierHandler(BaseEstimator, TransformerMixin):
         # --- Decide which columns to process ---
         if self.cols is None:
             candidates = df.select_dtypes(include="number").columns.tolist()
-            # Skip id-like columns — outlier detection on IDs makes no sense
+            # Skip id-like columns - outlier detection on IDs makes no sense
             self.cols_ = [
                 c for c in candidates
                 if not (str(c).lower().endswith("id") or str(c).lower() == "id")
@@ -293,7 +297,7 @@ class ClientOutlierHandler(BaseEstimator, TransformerMixin):
                 mad = float(np.median(np.abs(s - med)))
 
                 if mad <= 0:
-                    # MAD = 0 means no spread — skip this method for this column
+                    # MAD = 0 means no spread - skip this method for this column
                     col_stats["mod_z"] = {"lower": -np.inf, "upper": np.inf}
                 else:
                     delta = (self.z_thresh * mad) / 0.6745
@@ -345,7 +349,7 @@ class ClientOutlierHandler(BaseEstimator, TransformerMixin):
             outliers_per_col[col] = n_flagged
 
             if n_flagged > 0:
-                # Set to NaN — imputer handles these in the next step
+                # Set to NaN - imputer handles these in the next step
                 df.loc[outlier_mask, col] = np.nan
 
         # --- Build report ---
@@ -412,7 +416,7 @@ class ClientImputer(BaseEstimator, TransformerMixin):
     ):
         # NOTE: ffill/bfill for datetime columns is row-order-dependent.
         # After a shuffled train/test split, ffill fills from a random
-        # neighbor — not meaningful.  This is safe when no datetime cols
+        # neighbor - not meaningful.  This is safe when no datetime cols
         # are present (as in the current ABT), but should be revisited
         # if raw date columns are ever passed through the pipeline.
         self.numeric_strategy  = numeric_strategy
@@ -510,11 +514,11 @@ class ClientImputer(BaseEstimator, TransformerMixin):
         """Prints a human-readable summary of the last transform() call."""
         print("[ClientImputer]")
         print(f"  Numeric  imputed [{self.numeric_strategy}]  : "
-              f"{self.report_['numeric_imputed'] or '—'}")
+              f"{self.report_['numeric_imputed'] or '-'}")
         print(f"  Datetime imputed [{self.datetime_strategy}] : "
-              f"{self.report_['datetime_imputed'] or '—'}")
+              f"{self.report_['datetime_imputed'] or '-'}")
         print(f"  Categ.   imputed ['{self.categorical_fill}']  : "
-              f"{self.report_['categorical_imputed'] or '—'}")
+              f"{self.report_['categorical_imputed'] or '-'}")
         print()
 
 
@@ -603,7 +607,7 @@ class ClientFeatureEngineer(BaseEstimator, TransformerMixin):
     All statistics used in relative features are learned in fit() from the
     training fold only, preventing data leakage during cross-validation.
     Division-by-zero is handled throughout by replacing 0 denominators with
-    NaN before dividing — the imputer upstream ensures no NaNs reach this step,
+    NaN before dividing - the imputer upstream ensures no NaNs reach this step,
     but the guards are kept as a safety net.
 
     Args:
@@ -633,7 +637,7 @@ class ClientFeatureEngineer(BaseEstimator, TransformerMixin):
         self.verbose           = verbose
 
     def fit(self, X, y=None):
-        """No statistics to learn — all features use row-level calculations.
+        """No statistics to learn - all features use row-level calculations.
 
         fit() is kept as a no-op here because all engineered features are
         deterministic row-level transformations (ratios, differences, maps).
@@ -666,7 +670,7 @@ class ClientFeatureEngineer(BaseEstimator, TransformerMixin):
         # 1. CONTRACT MATURITY & REPAYMENT                                     #
         # ------------------------------------------------------------------ #
 
-        # Fraction of principal already repaid — clipped to [0, 1]  DATA LEAKAGE
+        # Fraction of principal already repaid - clipped to [0, 1]  DATA LEAKAGE
         #df["REPAYMENT_RATIO"] = (
         #    (df["MTFINO"] - df["CRD"]) / df["MTFINO"].replace(0, np.nan)
         #).clip(0, 1)
@@ -952,4 +956,343 @@ class ClientFeatureEngineer(BaseEstimator, TransformerMixin):
         print(f"  New columns      :")
         for name in self.feature_names_created_:
             print(f"    + {name}")
+        print()
+
+
+
+
+
+class ClientFeatureSelection(BaseEstimator, TransformerMixin):
+    """
+    Leak-safe feature selector for client modelling pipelines.
+
+    Steps performed inside fit(X, y) on the training fold only:
+        1. Correlation-based pruning
+        2. LASSO selection
+        3. RFE selection
+        4. Random Forest importance selection
+        5. Voting aggregation
+
+    transform(X) only applies the learned feature subset.
+
+    Parameters
+    ----------
+    corr_threshold : float, default=0.90
+        Absolute correlation threshold above which one feature is removed.
+
+    use_lasso : bool, default=True
+        Whether to include LASSO in the voting scheme.
+
+    use_rfe : bool, default=True
+        Whether to include RFE in the voting scheme.
+
+    use_rf : bool, default=True
+        Whether to include Random Forest importance in the voting scheme.
+
+    min_votes : int, default=2
+        Minimum number of methods that must select a feature for it to be kept.
+
+    lasso_C : float, default=0.1
+        Inverse regularisation strength for L1 logistic regression.
+
+    lasso_max_iter : int, default=2000
+        Maximum iterations for LASSO logistic regression.
+
+    rfe_fraction : float, default=0.6
+        Fraction of post-correlation features to keep in RFE.
+        Ignored if rfe_n_features is not None.
+
+    rfe_n_features : int or None, default=None
+        Exact number of features to keep in RFE. If None, uses rfe_fraction.
+
+    rfe_step : int or float, default=0.1
+        Number or fraction of features to remove at each RFE iteration.
+
+    rfe_max_iter : int, default=5000
+        Maximum iterations for the logistic regression estimator used in RFE.
+
+    rf_n_estimators : int, default=500
+        Number of trees in the Random Forest.
+
+    rf_threshold : {'median', 'mean'} or float, default='median'
+        Threshold applied to RF feature importances.
+        If float, keep features with importance strictly greater than this value.
+
+    random_state : int, default=42
+        Random seed.
+
+    verbose : bool, default=False
+        Whether to print a summary during fit/transform.
+
+    Attributes
+    ----------
+    features_after_corr_ : list[str]
+        Features remaining after correlation pruning.
+
+    lasso_features_ : list[str]
+        Features selected by LASSO.
+
+    rfe_features_ : list[str]
+        Features selected by RFE.
+
+    rf_features_ : list[str]
+        Features selected by Random Forest importance.
+
+    selected_features_ : list[str]
+        Final voted feature set.
+
+    feature_audit_ : pd.DataFrame
+        Per-feature selection audit table.
+    """
+
+    def __init__(
+        self,
+        corr_threshold=0.90,
+        use_lasso=True,
+        use_rfe=True,
+        use_rf=True,
+        min_votes=2,
+        lasso_C=0.1,
+        lasso_max_iter=2000,
+        rfe_fraction=0.6,
+        rfe_n_features=None,
+        rfe_step=0.1,
+        rfe_max_iter=5000,
+        rf_n_estimators=500,
+        rf_threshold="median",
+        random_state=42,
+        verbose=False,
+    ):
+        self.corr_threshold = corr_threshold
+        self.use_lasso = use_lasso
+        self.use_rfe = use_rfe
+        self.use_rf = use_rf
+        self.min_votes = min_votes
+        self.lasso_C = lasso_C
+        self.lasso_max_iter = lasso_max_iter
+        self.rfe_fraction = rfe_fraction
+        self.rfe_n_features = rfe_n_features
+        self.rfe_step = rfe_step
+        self.rfe_max_iter = rfe_max_iter
+        self.rf_n_estimators = rf_n_estimators
+        self.rf_threshold = rf_threshold
+        self.random_state = random_state
+        self.verbose = verbose
+
+    def fit(self, X, y):
+        X_df = pd.DataFrame(X).copy()
+        y_sr = pd.Series(y).reset_index(drop=True)
+        X_df = X_df.reset_index(drop=True)
+
+        if X_df.empty:
+            raise ValueError("X is empty.")
+        if y is None:
+            raise ValueError("ClientFeatureSelection requires y in fit(X, y).")
+
+        self.input_features_ = X_df.columns.tolist()
+
+        # 1) Correlation pruning
+        self.features_after_corr_, self.corr_dropped_, self.corr_drop_reasons_ = \
+            self._correlation_prune(X_df)
+
+        X_corr = X_df[self.features_after_corr_].copy()
+
+        # 2) LASSO
+        if self.use_lasso:
+            self.lasso_features_ = self._run_lasso(X_corr, y_sr)
+        else:
+            self.lasso_features_ = []
+
+        # 3) RFE
+        if self.use_rfe:
+            self.rfe_features_ = self._run_rfe(X_corr, y_sr)
+        else:
+            self.rfe_features_ = []
+
+        # 4) Random Forest importance
+        if self.use_rf:
+            self.rf_features_ = self._run_rf(X_corr, y_sr)
+        else:
+            self.rf_features_ = []
+
+        # 5) Voting
+        votes = Counter()
+        for feat in self.lasso_features_:
+            votes[feat] += 1
+        for feat in self.rfe_features_:
+            votes[feat] += 1
+        for feat in self.rf_features_:
+            votes[feat] += 1
+
+        # If only one method is active, adapt minimum votes automatically
+        active_methods = int(self.use_lasso) + int(self.use_rfe) + int(self.use_rf)
+        effective_min_votes = min(self.min_votes, active_methods)
+
+        vote_series = pd.Series(votes, dtype=int)
+        if vote_series.empty:
+            raise ValueError(
+                "No features were selected by any supervised method. "
+                "Relax the thresholds or inspect the data."
+            )
+
+        self.vote_series_ = vote_series.sort_values(ascending=False)
+        self.selected_features_ = (
+            self.vote_series_[self.vote_series_ >= effective_min_votes]
+            .index.tolist()
+        )
+
+        if len(self.selected_features_) == 0:
+            raise ValueError(
+                "Voting removed all features. "
+                "Try lowering min_votes or relaxing selector thresholds."
+            )
+
+        # Audit table
+        audit = pd.DataFrame(index=self.features_after_corr_)
+        audit["kept_after_corr"] = True
+        audit["LASSO"] = audit.index.isin(self.lasso_features_)
+        audit["RFE"] = audit.index.isin(self.rfe_features_)
+        audit["RF"] = audit.index.isin(self.rf_features_)
+        audit["votes"] = audit[["LASSO", "RFE", "RF"]].sum(axis=1)
+        audit["selected_final"] = audit.index.isin(self.selected_features_)
+        self.feature_audit_ = audit.sort_values(
+            by=["selected_final", "votes"], ascending=[False, False]
+        )
+
+        self.n_features_in_ = X_df.shape[1]
+        self.n_features_out_ = len(self.selected_features_)
+
+        if self.verbose:
+            self._print_fit_summary()
+
+        return self
+
+    def transform(self, X):
+        check_is_fitted(self, "selected_features_")
+        X_df = pd.DataFrame(X).copy()
+
+        missing = [c for c in self.selected_features_ if c not in X_df.columns]
+        if missing:
+            raise ValueError(
+                f"transform() is missing selected columns: {missing}"
+            )
+
+        X_out = X_df[self.selected_features_].copy()
+
+        if self.verbose:
+            print("[ClientFeatureSelection]")
+            print(f"  Input shape  : {X_df.shape}")
+            print(f"  Output shape : {X_out.shape}")
+            print()
+
+        return X_out
+
+    def get_feature_names_out(self, input_features=None):
+        check_is_fitted(self, "selected_features_")
+        return np.array(self.selected_features_, dtype=object)
+
+    def get_support(self, indices=False):
+        check_is_fitted(self, "selected_features_")
+        support = np.array([f in self.selected_features_ for f in self.input_features_])
+        if indices:
+            return np.where(support)[0]
+        return support
+
+    def _correlation_prune(self, X_df):
+        corr_matrix = X_df.corr().abs()
+
+        upper = corr_matrix.where(
+            np.triu(np.ones(corr_matrix.shape), k=1).astype(bool)
+        )
+
+        to_drop = []
+        drop_reasons = {}
+
+        while True:
+            high_corr_counts = (upper > self.corr_threshold).sum()
+            max_count = high_corr_counts.max()
+
+            if max_count == 0:
+                break
+
+            worst_feature = high_corr_counts.idxmax()
+
+            partners = upper.index[upper[worst_feature] > self.corr_threshold].tolist()
+            drop_reasons[worst_feature] = partners
+            to_drop.append(worst_feature)
+
+            upper = upper.drop(index=worst_feature, columns=worst_feature)
+
+        remaining = [f for f in X_df.columns if f not in to_drop]
+        return remaining, to_drop, drop_reasons
+
+    def _run_lasso(self, X_df, y_sr):
+        model = LogisticRegression(
+            penalty="l1",
+            solver="liblinear",
+            C=self.lasso_C,
+            max_iter=self.lasso_max_iter,
+            random_state=self.random_state,
+        )
+        model.fit(X_df, y_sr)
+
+        mask = np.abs(model.coef_).ravel() > 1e-6
+        return X_df.columns[mask].tolist()
+
+    def _run_rfe(self, X_df, y_sr):
+        estimator = LogisticRegression(
+            penalty="l2",
+            solver="liblinear",
+            max_iter=self.rfe_max_iter,
+            random_state=self.random_state,
+        )
+
+        if self.rfe_n_features is not None:
+            n_select = int(self.rfe_n_features)
+        else:
+            n_select = max(1, int(np.ceil(self.rfe_fraction * X_df.shape[1])))
+
+        n_select = min(n_select, X_df.shape[1])
+
+        selector = RFE(
+            estimator=estimator,
+            n_features_to_select=n_select,
+            step=self.rfe_step,
+        )
+        selector.fit(X_df, y_sr)
+
+        return X_df.columns[selector.support_].tolist()
+
+    def _run_rf(self, X_df, y_sr):
+        model = RandomForestClassifier(
+            n_estimators=self.rf_n_estimators,
+            random_state=self.random_state,
+            n_jobs=-1,
+        )
+        model.fit(X_df, y_sr)
+
+        importances = pd.Series(model.feature_importances_, index=X_df.columns)
+
+        if self.rf_threshold == "median":
+            threshold = importances.median()
+        elif self.rf_threshold == "mean":
+            threshold = importances.mean()
+        elif isinstance(self.rf_threshold, (int, float)):
+            threshold = float(self.rf_threshold)
+        else:
+            raise ValueError(
+                "rf_threshold must be 'median', 'mean', or a numeric value."
+            )
+
+        return importances[importances > threshold].index.tolist()
+
+    def _print_fit_summary(self):
+        print("[ClientFeatureSelection]")
+        print(f"  Input features              : {self.n_features_in_}")
+        print(f"  After correlation filter    : {len(self.features_after_corr_)}")
+        print(f"  Correlation drops           : {len(self.corr_dropped_)}")
+        print(f"  LASSO selected              : {len(self.lasso_features_)}")
+        print(f"  RFE selected                : {len(self.rfe_features_)}")
+        print(f"  RF selected                 : {len(self.rf_features_)}")
+        print(f"  Final selected (voting)     : {self.n_features_out_}")
         print()
