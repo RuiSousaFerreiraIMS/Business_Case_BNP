@@ -18,6 +18,10 @@ if "sort_col" not in st.session_state:
     st.session_state.sort_col = "REVENUE_AT_RISK"
 if "sort_asc" not in st.session_state:
     st.session_state.sort_asc = False
+if "page_num" not in st.session_state:
+    st.session_state.page_num = 0
+if "hide_unassigned" not in st.session_state:
+    st.session_state.hide_unassigned = True
 
 # ── CSS ───────────────────────────────────────────────────────────────────
 st.markdown("""
@@ -63,17 +67,43 @@ html, body, [class*="css"], .stApp {
 .topbar-tag   { font-size: 11px; color: #718096; background: #F5F7FA;
                 border: 1px solid #E2E8F0; padding: 3px 10px; border-radius: 20px; }
 
-/* ── Nav row (sits directly under topbar) ── */
-/* We target ONLY the nav columns wrapper by giving it a custom class via markdown */
-.nav-row-wrap {
-    background: #F8FAFB;
-    border-bottom: 1px solid #E2E8F0;
-    padding: 0 2rem;
-    display: flex;
-    gap: 0;
+/* ── All Streamlit buttons — white base style ── */
+.stButton > button {
+    background: #FFFFFF !important;
+    color: #2D3748 !important;
+    border: 1.5px solid #E2E8F0 !important;
+    border-radius: 8px !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    height: 38px !important;
+    padding: 0 16px !important;
+    font-family: 'Source Sans 3', sans-serif !important;
+    box-shadow: none !important;
+    transition: border-color .15s, color .15s, background .15s !important;
+    white-space: nowrap !important;
+    width: 100% !important;
+}
+.stButton > button:hover {
+    border-color: #00915A !important;
+    color: #00915A !important;
+    background: #F0FBF7 !important;
+}
+.stButton > button p {
+    color: inherit !important;
+    font-size: 13px !important;
+    font-weight: inherit !important;
 }
 
-/* Target nav buttons specifically via their data-testid key prefix */
+/* ── Navbar background strip (targets the row that contains nav buttons) ── */
+[data-testid="stHorizontalBlock"]:has([data-testid^="stButton-nav_"]) {
+    background: #F8FAFB !important;
+    border-bottom: 2px solid #E2E8F0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    gap: 0 !important;
+}
+
+/* ── Nav tab buttons (override base) ── */
 [data-testid^="stButton-nav_"] > button {
     background: transparent !important;
     border: none !important;
@@ -83,16 +113,18 @@ html, body, [class*="css"], .stApp {
     font-size: 13px !important;
     font-weight: 500 !important;
     padding: 10px 22px !important;
-    height: 44px !important;
+    height: 46px !important;
     box-shadow: none !important;
     width: 100% !important;
     font-family: 'Source Sans 3', sans-serif !important;
-    transition: color .15s;
+    transition: color .15s, border-color .15s !important;
     white-space: nowrap !important;
 }
 [data-testid^="stButton-nav_"] > button:hover {
     color: #00915A !important;
     background: transparent !important;
+    border-color: transparent !important;
+    border-bottom-color: #D1FAE5 !important;
 }
 [data-testid^="stButton-nav_"] > button p {
     color: inherit !important;
@@ -105,14 +137,12 @@ html, body, [class*="css"], .stApp {
     color: #00915A !important;
     border-bottom: 3px solid #00915A !important;
     font-weight: 700 !important;
+    background: transparent !important;
 }
 [data-testid="stButton-nav_active"] > button p {
     color: #00915A !important;
     font-weight: 700 !important;
 }
-
-/* Remove Streamlit column gap/padding for nav row */
-.nav-col > div { padding: 0 !important; margin: 0 !important; }
 
 /* ── Page body ── */
 .page-body { padding: 1.75rem 2.5rem; }
@@ -185,6 +215,39 @@ html, body, [class*="css"], .stApp {
 .todo-t { font-size: 15px; font-weight: 600; color: #2D3748; margin-bottom: 6px; }
 .todo-s { font-size: 13px; color: #718096; line-height: 1.6; }
 
+/* ── View button — green accent ── */
+[data-testid^="stButton-view_"] > button {
+    background: #00915A !important;
+    color: #FFFFFF !important;
+    border-color: #00915A !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    height: 32px !important;
+}
+[data-testid^="stButton-view_"] > button:hover {
+    background: #007A4C !important;
+    border-color: #007A4C !important;
+    color: #FFFFFF !important;
+}
+[data-testid^="stButton-view_"] > button p { color: #FFFFFF !important; }
+
+/* ── Back button ── */
+[data-testid="stButton-back_btn"] > button {
+    background: #F5F7FA !important;
+    color: #718096 !important;
+    border-color: #E2E8F0 !important;
+    width: auto !important;
+    font-size: 12px !important;
+}
+
+/* ── Selectbox styling ── */
+[data-testid="stSelectbox"] > div > div {
+    border: 1.5px solid #E2E8F0 !important;
+    border-radius: 8px !important;
+    font-size: 13px !important;
+    min-height: 42px !important;
+}
+
 /* ── Search input ── */
 [data-testid="stTextInput"] input {
     border-radius: 8px !important;
@@ -196,6 +259,27 @@ html, body, [class*="css"], .stApp {
 [data-testid="stTextInput"] input:focus {
     border-color: #00915A !important;
     box-shadow: 0 0 0 3px rgba(0,145,90,.1) !important;
+}
+
+/* ── Checkbox label ── */
+[data-testid="stCheckbox"] label {
+    font-size: 13px !important;
+    color: #2D3748 !important;
+    font-weight: 500 !important;
+}
+[data-testid="stCheckbox"] label:hover {
+    color: #00915A !important;
+}
+
+/* ── Table row columns — remove vertical gap ── */
+[data-testid="stHorizontalBlock"]:has([data-testid^="stButton-view_"]) {
+    gap: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+[data-testid="stHorizontalBlock"]:has([data-testid^="stButton-view_"]) > div {
+    padding: 0 !important;
+    margin: 0 !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -210,28 +294,49 @@ def safe_get(series, key, default="—"):
 
 def action_style(action):
     return {
-        "Urgent retention":   ("urgent",   "#C0392B"),
-        "Offer new product":  ("offer",    "#00693E"),
-        "Upsell opportunity": ("upsell",   "#0066CC"),
-        "Monitor":            ("monitor",  "#92400E"),
-        "Standard follow-up": ("standard", "#718096"),
+        "Urgent restructuring": ("urgent",   "#C0392B"),
+        "Urgent retention":     ("urgent",   "#C0392B"),
+        "Debt monitoring":      ("monitor",  "#92400E"),
+        "Refinancing offer":    ("offer",    "#00693E"),
+        "Upsell opportunity":   ("upsell",   "#0066CC"),
+        "Competitive proposal": ("upsell",   "#0066CC"),
+        "Consolidation offer":  ("offer",    "#00693E"),
+        "Renewal campaign":     ("monitor",  "#92400E"),
+        "Cross-sell":           ("upsell",   "#0066CC"),
+        "Monitor":              ("monitor",  "#92400E"),
+        "Standard follow-up":   ("standard", "#718096"),
     }.get(action, ("standard", "#718096"))
 
-def action_description(action):
+def action_description(action, p_san=None, p_churn=None, cluster=None):
+    san_str   = f"{p_san:.0%}"   if p_san   is not None else "—"
+    churn_str = f"{p_churn:.0%}" if p_churn is not None else "—"
     return {
-        "Urgent retention":   "High probability of early settlement AND churn. Immediate outreach recommended — offer a retention incentive or restructured product before the client leaves.",
-        "Offer new product":  "Client is likely to settle early but shows low churn risk — they want to stay. Contact proactively with a new loan offer to retain the relationship.",
-        "Upsell opportunity": "Stable client with low churn risk and low early settlement probability. Good candidate for a new product or credit line expansion.",
-        "Monitor":            "Low early settlement risk but moderate churn signal. Keep in regular contact and monitor for changes in financial behaviour.",
-        "Standard follow-up": "No immediate action required. Include in standard periodic review cycle.",
+        "Urgent restructuring":  f"Delinquency risk is critical (P(Churn)={churn_str}). Contact immediately to renegotiate debt terms before the client defaults or exits.",
+        "Urgent retention":      f"High-value client at serious risk — P(SAN)={san_str} and P(Churn)={churn_str}. Offer a retention incentive or restructured product before they act.",
+        "Debt monitoring":       f"Financial stress signals detected (P(Churn)={churn_str}). Schedule a proactive outreach call — intervene before delinquency escalates.",
+        "Refinancing offer":     f"Client likely to settle early (P(SAN)={san_str}) but low churn risk — they want to stay. Contact with a refinancing offer before the decision is made.",
+        "Upsell opportunity":    f"Stable high-value client — P(SAN)={san_str}, P(Churn)={churn_str}. Good moment to propose a new product or credit line expansion.",
+        "Competitive proposal":  f"Significant external credit exposure with P(Churn)={churn_str}. Present a counter-proposal before the client migrates to a competitor.",
+        "Consolidation offer":   f"Client spreads credit across multiple providers (P(SAN)={san_str}). Offer debt consolidation to increase share of wallet at Cetelem.",
+        "Renewal campaign":      f"Contract nearing end — P(Churn)={churn_str}. No financial pressure detected. Target with a renewal offer before natural exit.",
+        "Cross-sell":            f"Stable and low-risk client — P(SAN)={san_str}, P(Churn)={churn_str}. Good moment to introduce a complementary product.",
+        "Monitor":               f"No immediate action required. P(Churn)={churn_str} — monitor for changes in financial behaviour.",
+        "Standard follow-up":    f"No immediate action required. Include in standard periodic review cycle.",
     }.get(action, "—")
 
 CLUSTER_PROFILES = {
-    0: ("High-value stable",     "#00915A", "Long tenure, low DTI, strong behavioral score. Low risk of churn or early settlement."),
-    1: ("Early settlement risk", "#C0392B", "High repayment ratio and low remaining term. Likely to settle before contract end."),
-    2: ("Churn risk",            "#B7791F", "Moderate DTI, declining risk trend. Monitor closely for signs of disengagement."),
-    3: ("Renewal opportunity",   "#0066CC", "Recently settled or nearing end of contract. High propensity to take a new product."),
-    4: ("New client",            "#718096", "Short contract age, limited history. Insufficient data for strong prediction."),
+    1: ("High Risk / Overdue",    "#E24B4A", "Significant overdue amounts and recent delinquency signals (MONTVENC, RISK_EVER). Churn 36.7% — mixed early and natural exits."),
+    2: ("High Value",             "#378ADD", "Multiple high-value contracts, highest income and LTI=24. Early settlement rate 46.6% — by far the highest of all segments."),
+    3: ("High External Credit",   "#1D9E75", "High external consumer credit and total debt. Moderate churn 38.4%, spreading credit across competing providers."),
+    4: ("Base / Dormant",         "#BA7517", "Low engagement, passive exits. Natural churn dominates (21.1%). Complete contracts but do not renew — largest segment (50%)."),
+}
+
+# Intervention windows (start%, end% of contract lifecycle) + action per segment
+CLUSTER_INTERVENTION = {
+    1: (25, 75,  "Recovery restructuring",  "Debt renegotiation and restructuring before delinquency escalates further."),
+    2: (25, 50,  "Refinancing offer",       "New contract or refinancing proposal before the early settlement decision is made. LTI=24 confirms financial capacity."),
+    3: (50, 75,  "Competitive proposal",    "Address external credit alternatives. Client manages multiple providers — offer a compelling counter-proposal."),
+    4: (75, 100, "Renewal campaign",        "Cross-sell and renewal offer in the final quarter, before natural contract end."),
 }
 
 # Table column config for Client Search
@@ -251,50 +356,86 @@ TABLE_COLS = {
 
 @st.cache_data
 def load_data():
+
+    def assign_action(p_san, p_churn, cluster):
+        if cluster == 1:
+            return "Urgent restructuring" if p_churn >= 0.60 else "Debt monitoring"
+        elif cluster == 2:
+            if p_san >= 0.65 and p_churn >= 0.55:
+                return "Urgent retention"
+            elif p_san >= 0.65:
+                return "Refinancing offer"
+            else:
+                return "Upsell opportunity"
+        elif cluster == 3:
+            if p_churn >= 0.55:
+                return "Competitive proposal"
+            elif p_san >= 0.55:
+                return "Consolidation offer"
+            else:
+                return "Monitor"
+        elif cluster == 4:
+            if p_churn >= 0.60:
+                return "Renewal campaign"
+            elif p_san < 0.35 and p_churn < 0.35:
+                return "Cross-sell"
+            else:
+                return "Standard follow-up"
+        else:
+            return "Standard follow-up"
+
     try:
         df = pd.read_parquet("data/prepared/active_clients_scored.parquet")
-        df = df.rename(columns={"Prob_SAN": "P_SAN", "Prob_Churn": "P_CHURN"})
-        for col, default in [
-            ("P_SAN", None), ("P_CHURN", None), ("CLUSTER", 0),
-            ("ACTION", "Standard follow-up"), ("REVENUE_AT_RISK", 0),
-        ]:
-            if col not in df.columns:
-                df[col] = default
+        df = df.rename(columns={
+            "Prob_SAN":      "P_SAN",
+            "Prob_Churn":    "P_CHURN",
+            "segment_final": "CLUSTER",
+        })
+
+        df["CLUSTER"] = df["CLUSTER"].fillna(0).astype(int)
+        df["P_SAN"] = df["P_SAN"].fillna(0)
+        df["P_CHURN"] = df["P_CHURN"].fillna(0)
+
+        # Action — derived from cluster + scores
+        df["ACTION"] = df.apply(
+            lambda r: assign_action(r["P_SAN"], r["P_CHURN"], r["CLUSTER"]), axis=1
+        )
+
+        # Revenue at risk — interest lost if client settles early
+        INTEREST_RATE = 0.08
+        df["REVENUE_AT_RISK"] = (
+            df["TOTAL_MTFINO"]
+            * INTEREST_RATE
+            * (df["MEDIAN_DURDEG"] / 12)
+            * df["P_SAN"]
+        ).round(2)
+
         return df
+
     except FileNotFoundError:
-        # ── Synthetic data with realistic spread ──
+        # ── Synthetic data ──────────────────────────────────────────────
         rng = np.random.default_rng(42)
         n = 150
-        cluster = rng.integers(0, 5, n)
-        # Each cluster has a different base churn/SAN probability
-        cluster_san_base   = {0: 0.15, 1: 0.80, 2: 0.35, 3: 0.55, 4: 0.30}
-        cluster_churn_base = {0: 0.10, 1: 0.45, 2: 0.70, 3: 0.25, 4: 0.40}
-        p_san   = np.clip([cluster_san_base[c]   + rng.normal(0, 0.12) for c in cluster], 0.02, 0.98)
-        p_churn = np.clip([cluster_churn_base[c] + rng.normal(0, 0.12) for c in cluster], 0.02, 0.98)
-        actions = []
-        for s, ch in zip(p_san, p_churn):
-            if s >= 0.65 and ch >= 0.55:
-                actions.append("Urgent retention")
-            elif s >= 0.65 and ch < 0.40:
-                actions.append("Offer new product")
-            elif s < 0.35 and ch < 0.35:
-                actions.append("Upsell opportunity")
-            elif ch >= 0.45:
-                actions.append("Monitor")
-            else:
-                actions.append("Standard follow-up")
+        cluster = rng.choice([1, 2, 3, 4], n, p=[0.20, 0.16, 0.14, 0.50])
+        cluster_san_base   = {1: 0.255, 2: 0.466, 3: 0.269, 4: 0.228}
+        cluster_churn_base = {1: 0.367, 2: 0.519, 3: 0.384, 4: 0.435}
+        p_san   = np.clip([cluster_san_base[c]   + rng.normal(0, 0.10) for c in cluster], 0.02, 0.98)
+        p_churn = np.clip([cluster_churn_base[c] + rng.normal(0, 0.10) for c in cluster], 0.02, 0.98)
+        total_mtfino   = np.round(rng.uniform(5000, 30000, n), 2)
+        median_durdeg  = np.round(rng.uniform(12, 60, n), 1)
+        actions = [assign_action(s, ch, c) for s, ch, c in zip(p_san, p_churn, cluster)]
+        revenue = np.round(total_mtfino * 0.08 * (median_durdeg / 12) * p_san, 2)
         return pd.DataFrame({
-            "CONTRIB":               [f"C-{10000+i}" for i in range(n)],
-            "TYPEPROD":              rng.choice(["CL", "CP"], n),
-            "PRODALP":               rng.choice(["AUTO", "PESSOAL", "HABITACAO"], n),
-            "sdem_age":              rng.integers(25, 70, n),
-            "MENSALIDADE":           np.round(rng.uniform(150, 800, n), 2),
-            "REMAINING_TERM_MONTHS": np.round(rng.uniform(3, 60, n), 1),
-            "P_SAN":                 np.round(p_san, 3),
-            "P_CHURN":               np.round(p_churn, 3),
-            "CLUSTER":               cluster,
-            "ACTION":                actions,
-            "REVENUE_AT_RISK":       np.round(rng.uniform(500, 15000, n), 2),
+            "CONTRIB":        [f"C-{10000+i}" for i in range(n)],
+            "sdem_age":       rng.integers(25, 70, n),
+            "PRODALP":        rng.choice(["AUTO", "PESSOAL", "HABITACAO"], n),
+            "TOTAL_MTFINO":   total_mtfino,
+            "MEDIAN_DURDEG":  median_durdeg,
+            "P_SAN":          np.round(p_san, 3),
+            "P_CHURN":        np.round(p_churn, 3),
+            "CLUSTER":        cluster,
+            "ACTION":         actions,
+            "REVENUE_AT_RISK": revenue,
         })
 
 df_all = load_data()
@@ -316,13 +457,13 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Nav tabs rendered as buttons — use key prefix "nav_" so CSS targets them
+# Nav tabs rendered as buttons — centered with spacer columns on each side
 PAGES = ["Portfolio Overview", "Client Search", "Clustering", "Model Metrics"]
-nav_cols = st.columns(len(PAGES) + 6)   # extra cols push tabs left, rest is empty
+nav_cols = st.columns([3, 2, 2, 2, 2, 3])   # spacers on left/right to center the 4 tabs
 for i, pg in enumerate(PAGES):
     # Give active tab a distinct key so CSS [data-testid="stButton-nav_active"] fires
     key = "nav_active" if st.session_state.page == pg else f"nav_{i}"
-    with nav_cols[i]:
+    with nav_cols[i + 1]:
         if st.button(pg, key=key, use_container_width=True):
             st.session_state.page = pg
             st.session_state.selected_client = None
@@ -377,12 +518,27 @@ if page == "Portfolio Overview":
         st.markdown("<div class='slabel'>Action priority breakdown</div>", unsafe_allow_html=True)
         action_counts = df_all["ACTION"].value_counts().reset_index()
         action_counts.columns = ["Action", "Clients"]
-        priority_order = ["Urgent retention", "Offer new product", "Upsell opportunity", "Monitor", "Standard follow-up"]
+        priority_order = [
+            "Urgent restructuring", "Urgent retention",
+            "Debt monitoring", "Refinancing offer",
+            "Upsell opportunity", "Competitive proposal",
+            "Consolidation offer", "Renewal campaign",
+            "Cross-sell", "Monitor", "Standard follow-up",
+        ]
         action_counts["Action"] = pd.Categorical(action_counts["Action"], categories=priority_order, ordered=True)
         action_counts = action_counts.sort_values("Action")
         colors = {
-            "Urgent retention": "#C0392B", "Offer new product": "#00915A",
-            "Upsell opportunity": "#0066CC", "Monitor": "#B7791F", "Standard follow-up": "#718096",
+            "Urgent restructuring": "#C0392B",
+            "Urgent retention": "#C0392B",
+            "Debt monitoring": "#92400E",
+            "Refinancing offer": "#00693E",
+            "Upsell opportunity": "#0066CC",
+            "Competitive proposal": "#0066CC",
+            "Consolidation offer": "#00693E",
+            "Renewal campaign": "#92400E",
+            "Cross-sell": "#0066CC",
+            "Monitor": "#B7791F",
+            "Standard follow-up": "#718096",
         }
         for _, row in action_counts.iterrows():
             pct = row["Clients"] / n_total * 100
@@ -427,7 +583,7 @@ if page == "Portfolio Overview":
 elif page == "Client Search":
     st.markdown("<div class='page-body'>", unsafe_allow_html=True)
     st.markdown("<div class='page-title'>Client Search</div>", unsafe_allow_html=True)
-    st.markdown("<div class='page-desc'>Search by client ID · click a column header to sort · select a row to open the full profile.</div>", unsafe_allow_html=True)
+    st.markdown("<div class='page-desc'>Filter and explore your active client portfolio · click <b>View</b> to open the full risk profile.</div>", unsafe_allow_html=True)
 
     # ── If a client is selected, show profile ──────────────────────────
     selected_id = st.session_state.selected_client
@@ -458,13 +614,13 @@ elif page == "Client Search":
 
         p_san   = float(client["P_SAN"])
         p_churn = float(client["P_CHURN"])
-        cluster = int(client["CLUSTER"])
+        cl_id   = int(client["CLUSTER"])
         revenue = float(client["REVENUE_AT_RISK"])
         action  = str(client["ACTION"])
 
         san_color   = "#00915A" if p_san   >= 0.6 else "#B7791F" if p_san   >= 0.4 else "#718096"
         churn_color = "#C0392B" if p_churn >= 0.6 else "#B7791F" if p_churn >= 0.4 else "#718096"
-        cl_name, cl_color, cl_desc = CLUSTER_PROFILES.get(cluster, ("Unknown", "#718096", ""))
+        cl_name, cl_color, cl_desc = CLUSTER_PROFILES.get(cl_id, ("Unknown", "#718096", ""))
 
         g1, g2, g3, g4 = st.columns(4, gap="medium")
         with g1:
@@ -489,7 +645,7 @@ elif page == "Client Search":
             st.markdown(f"""<div class='gauge-wrap'>
                 <div class='gauge-title'>Cluster</div>
                 <div style='font-size:18px;font-weight:700;color:{cl_color};margin-bottom:5px'>
-                    #{cluster} · {cl_name}
+                    #{cl_id} · {cl_name}
                 </div>
                 <div class='gauge-label'>{cl_desc[:72]}…</div>
             </div>""", unsafe_allow_html=True)
@@ -504,10 +660,10 @@ elif page == "Client Search":
 
         st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
         st.markdown("<div class='slabel'>Recommended action</div>", unsafe_allow_html=True)
-        sty, col = action_style(action)
-        st.markdown(f"""<div class='action-card {sty}'>
-            <div class='action-title' style='color:{col}'>{action}</div>
-            <div class='action-desc'>{action_description(action)}</div>
+        act_sty, act_col = action_style(action)
+        st.markdown(f"""<div class='action-card {act_sty}'>
+            <div class='action-title' style='color:{act_col}'>{action}</div>
+            <div class='action-desc'>{action_description(action, p_san, p_churn, cl_id)}</div>
         </div>""", unsafe_allow_html=True)
 
         st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
@@ -521,99 +677,178 @@ elif page == "Client Search":
                 "TYPEPROD": "Product type", "PRODALP": "Product", "sdem_age": "Age",
             }
             dcols = st.columns(len(available))
-            for i, col_name in enumerate(available):
+            for di, col_name in enumerate(available):
                 val   = client[col_name]
                 label = labels.get(col_name, col_name)
                 if isinstance(val, (float, np.floating)):
                     val = f"€{val:,.2f}" if "MENSAL" in col_name else f"{val:.1f}"
-                with dcols[i]:
+                with dcols[di]:
                     st.markdown(f"""<div class='mc'>
                         <div class='mc-label'>{label}</div>
                         <div style='font-size:17px;font-weight:700;color:#1A2B22'>{val}</div>
                     </div>""", unsafe_allow_html=True)
 
     else:
-        # ── Search bar (always visible at top) ──────────────────────
-        search_query = st.text_input(
-            "search", placeholder="🔍  Search by Client ID  (e.g. C-10042)…",
-            label_visibility="collapsed", key="search_input"
-        )
+        # ── Filter bar ────────────────────────────────────────────────
+        ACTION_OPTIONS = [
+            "All actions", "Urgent restructuring", "Urgent retention",
+            "Debt monitoring", "Refinancing offer", "Upsell opportunity",
+            "Competitive proposal", "Consolidation offer",
+            "Renewal campaign", "Cross-sell", "Standard follow-up", "Monitor",
+        ]
+        RISK_OPTIONS = [
+            "All clients", "High SAN risk (≥ 60%)", "High churn risk (≥ 60%)", "Both high risk",
+        ]
+        SORT_MAP = {
+            "Revenue at risk ↓":   ("REVENUE_AT_RISK", False),
+            "P(Settlement) ↓":     ("P_SAN",           False),
+            "P(Churn) ↓":          ("P_CHURN",         False),
+            "Client ID ↑":         ("CONTRIB",         True),
+        }
 
-        # Filter
-        if search_query:
-            mask = df_all["CONTRIB"].astype(str).str.contains(search_query, case=False, na=False)
-            for extra in ["NOME", "NAME"]:
-                if extra in df_all.columns:
-                    mask = mask | df_all[extra].astype(str).str.contains(search_query, case=False, na=False)
-            results = df_all[mask].copy()
+        fc1, fc2, fc3, fc4, fc5 = st.columns([2.5, 1.8, 1.8, 1.8, 1.5])
+        with fc1:
+            search_q = st.text_input(
+                "search", placeholder="🔍  Search by Client ID…",
+                label_visibility="collapsed", key="search_input",
+            )
+        with fc2:
+            action_f = st.selectbox("Action", ACTION_OPTIONS,
+                                    label_visibility="collapsed", key="action_f")
+        with fc3:
+            risk_f = st.selectbox("Risk", RISK_OPTIONS,
+                                  label_visibility="collapsed", key="risk_f")
+        with fc4:
+            sort_f = st.selectbox("Sort by", list(SORT_MAP.keys()),
+                                  label_visibility="collapsed", key="sort_f")
+        with fc5:
+            hide_unassigned = st.checkbox(
+                "Hide unassigned clusters",
+                value=st.session_state.hide_unassigned,
+                key="hide_unassigned_cb",
+            )
+            st.session_state.hide_unassigned = hide_unassigned
+
+        # ── Apply filters ─────────────────────────────────────────────
+        results = df_all.copy()
+        if hide_unassigned:
+            results = results[results["CLUSTER"] != 0]
+        if search_q:
+            results = results[results["CONTRIB"].astype(str).str.contains(search_q, case=False, na=False)]
+        if action_f != "All actions":
+            results = results[results["ACTION"] == action_f]
+        if risk_f == "High SAN risk (≥ 60%)":
+            results = results[results["P_SAN"] >= 0.6]
+        elif risk_f == "High churn risk (≥ 60%)":
+            results = results[results["P_CHURN"] >= 0.6]
+        elif risk_f == "Both high risk":
+            results = results[(results["P_SAN"] >= 0.6) & (results["P_CHURN"] >= 0.6)]
+
+        sort_col_name, sort_asc_val = SORT_MAP[sort_f]
+        if sort_col_name in results.columns:
+            results = results.sort_values(sort_col_name, ascending=sort_asc_val)
+
+        # Reset to page 0 when filters change
+        if "last_filter_state" not in st.session_state or \
+           st.session_state.last_filter_state != (search_q, action_f, risk_f, sort_f, hide_unassigned):
+            st.session_state.page_num = 0
+            st.session_state.last_filter_state = (search_q, action_f, risk_f, sort_f, hide_unassigned)
+
+        # ── Pagination config ──────────────────────────────────────────
+        PAGE_SIZE   = 50
+        total_rows  = len(results)
+        total_pages = max(1, (total_rows + PAGE_SIZE - 1) // PAGE_SIZE)
+        current_page = min(st.session_state.page_num, total_pages - 1)
+        page_start   = current_page * PAGE_SIZE
+        page_end     = min(page_start + PAGE_SIZE, total_rows)
+        page_results = results.iloc[page_start:page_end]
+
+        # ── Summary strip + pagination in one bar ─────────────────────
+        n_res     = len(results)
+        n_urgent  = int(results["ACTION"].str.startswith("Urgent").sum())
+        rev_total = results["REVENUE_AT_RISK"].sum()
+
+        sum_col, nav_col = st.columns([2, 1])
+        with sum_col:
+            st.markdown(f"""
+            <div style='display:flex;gap:24px;align-items:center;padding:12px 0 14px;flex-wrap:wrap;
+                        border-bottom:2px solid #E2E8F0'>
+                <span style='font-size:13px;font-weight:700;color:#1A2B22'>{n_res:,} client(s)</span>
+                <span style='width:1px;height:14px;background:#E2E8F0;display:inline-block'></span>
+                <span style='font-size:12px;color:#C0392B;font-weight:600'>⚠ {n_urgent} urgent</span>
+                <span style='width:1px;height:14px;background:#E2E8F0;display:inline-block'></span>
+                <span style='font-size:12px;color:#718096'>Rev. at risk: <b style='color:#B7791F'>€{rev_total:,.0f}</b></span>
+            </div>""", unsafe_allow_html=True)
+        with nav_col:
+            nc1, nc2, nc3 = st.columns([1, 2, 1])
+            with nc1:
+                st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+                if current_page > 0:
+                    if st.button("←", key="prev_page", use_container_width=True):
+                        st.session_state.page_num = current_page - 1
+                        st.rerun()
+            with nc2:
+                st.markdown(f"<div style='text-align:center;padding-top:8px;font-size:12px;color:#718096'>"
+                            f"Page <b style='color:#1A2B22'>{current_page+1}</b> of {total_pages} "
+                            f"<span style='color:#A0AEC0'>· {page_start+1}–{page_end}</span></div>",
+                            unsafe_allow_html=True)
+            with nc3:
+                st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+                if current_page < total_pages - 1:
+                    if st.button("→", key="next_page", use_container_width=True):
+                        st.session_state.page_num = current_page + 1
+                        st.rerun()
+
+        if results.empty:
+            st.markdown("""<div class='todo' style='margin-top:1.5rem'>
+                <div class='todo-t'>No clients match the current filters</div>
+                <div class='todo-s'>Try adjusting the search or filter criteria above</div>
+            </div>""", unsafe_allow_html=True)
         else:
-            results = df_all.copy()
+            # ── Table header ──────────────────────────────────────────
+            st.markdown("""
+            <div style='display:grid;grid-template-columns:2fr 0.8fr 0.8fr 1.2fr 1.8fr 1.1fr 0.5fr;
+                        padding:8px 4px;border-bottom:2px solid #E2E8F0;gap:0'>
+                <div style='font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.06em'>Client ID</div>
+                <div style='font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.06em'>P(SAN)</div>
+                <div style='font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.06em'>P(Churn)</div>
+                <div style='font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.06em'>Cluster</div>
+                <div style='font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.06em'>Recommended action</div>
+                <div style='font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.06em'>Rev. at risk</div>
+                <div></div>
+            </div>""", unsafe_allow_html=True)
 
-        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+            # ── Data rows ─────────────────────────────────────────────
+            for idx, (_, r) in enumerate(page_results.iterrows()):
+                s_col = "#C0392B" if r["P_SAN"] >= 0.6 else "#B7791F" if r["P_SAN"] >= 0.4 else "#718096"
+                c_col = "#C0392B" if r["P_CHURN"] >= 0.6 else "#B7791F" if r["P_CHURN"] >= 0.4 else "#718096"
+                rn, rc, _ = CLUSTER_PROFILES.get(int(r["CLUSTER"]), ("—", "#718096", ""))
+                _, a_col  = action_style(r["ACTION"])
+                row_bg    = "#FAFBFC" if idx % 2 == 0 else "#FFFFFF"
+                contrib   = str(r['CONTRIB'])
+                contrib_short = contrib[:22] + "…" if len(contrib) > 22 else contrib
 
-        # Sort state buttons (rendered as small label above table)
-        sort_col = st.session_state.sort_col
-        sort_asc = st.session_state.sort_asc
+                san_badge = f"<span style='background:{s_col}18;color:{s_col};padding:2px 9px;border-radius:20px;font-size:12px;font-weight:700'>{r['P_SAN']:.0%}</span>"
+                chu_badge = f"<span style='background:{c_col}18;color:{c_col};padding:2px 9px;border-radius:20px;font-size:12px;font-weight:700'>{r['P_CHURN']:.0%}</span>"
+                act_badge = f"<span style='background:{a_col}18;color:{a_col};padding:2px 9px;border-radius:20px;font-size:12px;font-weight:600'>{r['ACTION']}</span>"
 
-        count_label = f"{len(results):,} client(s) found" if search_query else f"All {len(results):,} active clients"
-        st.markdown(f"<div class='slabel'>{count_label} — click a column header to sort</div>", unsafe_allow_html=True)
-
-        # Sort the results
-        if sort_col in results.columns:
-            results = results.sort_values(sort_col, ascending=sort_asc)
-
-        # ── Sortable column header buttons ──────────────────────────
-        col_keys   = list(TABLE_COLS.keys())
-        col_labels = list(TABLE_COLS.values())
-        # 7 columns + 1 narrow "Open" column
-        hcols = st.columns([1.2, 1.1, 1.1, 1.1, 1.4, 1.2, 0.6], gap="small")
-        for i, (ck, cl) in enumerate(zip(col_keys, col_labels)):
-            arrow = ""
-            if sort_col == ck:
-                arrow = " ↑" if sort_asc else " ↓"
-            with hcols[i]:
-                if st.button(
-                    f"{cl}{arrow}",
-                    key=f"sort_{ck}",
-                    use_container_width=True,
-                    help=f"Sort by {cl}",
-                ):
-                    if st.session_state.sort_col == ck:
-                        st.session_state.sort_asc = not st.session_state.sort_asc
-                    else:
-                        st.session_state.sort_col = ck
-                        st.session_state.sort_asc = False
-                    st.rerun()
-
-        # Divider under headers
-        st.markdown("<div style='height:1px;background:#E2E8F0;margin-bottom:2px'></div>", unsafe_allow_html=True)
-
-        # ── Data rows ────────────────────────────────────────────────
-        for idx, (_, r) in enumerate(results.iterrows()):
-            san_col   = "#00915A" if r["P_SAN"] >= 0.6 else "#B7791F" if r["P_SAN"] >= 0.4 else "#718096"
-            churn_col = "#C0392B" if r["P_CHURN"] >= 0.6 else "#B7791F" if r["P_CHURN"] >= 0.4 else "#718096"
-            cl_name, cl_color, _ = CLUSTER_PROFILES.get(int(r["CLUSTER"]), ("—", "#718096", ""))
-            act_sty, act_col = action_style(r["ACTION"])
-
-            row_cols = st.columns([1.2, 1.1, 1.1, 1.1, 1.4, 1.2, 0.6], gap="small")
-            with row_cols[0]:
-                st.markdown(f"<div style='padding:7px 0;font-weight:700;font-size:13px'>{r['CONTRIB']}</div>", unsafe_allow_html=True)
-            with row_cols[1]:
-                st.markdown(f"<div style='padding:7px 0;color:{san_col};font-weight:600;font-size:13px'>{r['P_SAN']:.0%}</div>", unsafe_allow_html=True)
-            with row_cols[2]:
-                st.markdown(f"<div style='padding:7px 0;color:{churn_col};font-weight:600;font-size:13px'>{r['P_CHURN']:.0%}</div>", unsafe_allow_html=True)
-            with row_cols[3]:
-                st.markdown(f"<div style='padding:7px 0;color:{cl_color};font-weight:600;font-size:13px'>#{int(r['CLUSTER'])} {cl_name}</div>", unsafe_allow_html=True)
-            with row_cols[4]:
-                st.markdown(f"<div style='padding:7px 0;color:{act_col};font-weight:600;font-size:13px'>{r['ACTION']}</div>", unsafe_allow_html=True)
-            with row_cols[5]:
-                st.markdown(f"<div style='padding:7px 0;font-weight:600;font-size:13px'>€{r['REVENUE_AT_RISK']:,.0f}</div>", unsafe_allow_html=True)
-            with row_cols[6]:
-                if st.button("Open →", key=f"open_{r['CONTRIB']}_{idx}", use_container_width=True):
-                    st.session_state.selected_client = r["CONTRIB"]
-                    st.rerun()
-
-            st.markdown("<div style='height:1px;background:#F0F2F5;margin:0'></div>", unsafe_allow_html=True)
+                row_col, btn_col = st.columns([11.5, 0.5], gap="small")
+                with row_col:
+                    st.markdown(f"""
+                    <div style='display:grid;grid-template-columns:2fr 0.8fr 0.8fr 1.2fr 1.8fr 1.1fr;
+                                padding:9px 4px;background:{row_bg};border-bottom:1px solid #F0F2F5;
+                                align-items:center;gap:0'>
+                        <div style='font-weight:700;font-size:13px;color:#1A2B22' title='{contrib}'>{contrib_short}</div>
+                        <div>{san_badge}</div>
+                        <div>{chu_badge}</div>
+                        <div style='font-size:12px;font-weight:600;color:{rc}'>#{int(r['CLUSTER'])} {rn}</div>
+                        <div>{act_badge}</div>
+                        <div style='font-weight:600;font-size:13px;color:#1A2B22'>€{r['REVENUE_AT_RISK']:,.0f}</div>
+                    </div>""", unsafe_allow_html=True)
+                with btn_col:
+                    if st.button("→", key=f"view_{contrib}_{idx}", use_container_width=True):
+                        st.session_state.selected_client = contrib
+                        st.rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -625,45 +860,109 @@ elif page == "Client Search":
 elif page == "Clustering":
     st.markdown("<div class='page-body'>", unsafe_allow_html=True)
     st.markdown("<div class='page-title'>Client Clustering</div>", unsafe_allow_html=True)
-    st.markdown("<div class='page-desc'>Client segments based on behavioural and financial profile.</div>", unsafe_allow_html=True)
+    st.markdown("<div class='page-desc'>4 segments via multi-perspective K-Means (P1 Financial · P2 Risk · P3 History) + Ward hierarchical merging on centroids.</div>", unsafe_allow_html=True)
 
+    # ── Segment summary cards ──────────────────────────────────────────
     cluster_counts = df_all["CLUSTER"].value_counts().sort_index()
-    cols = st.columns(len(CLUSTER_PROFILES), gap="medium")
+    seg_cols = st.columns(4, gap="medium")
     for i, (cid, (cname, ccolor, cdesc)) in enumerate(CLUSTER_PROFILES.items()):
-        n   = int(cluster_counts.get(cid, 0))
-        pct = n / len(df_all) * 100
+        n         = int(cluster_counts.get(cid, 0))
+        pct       = n / max(len(df_all), 1) * 100
         avg_san   = df_all[df_all["CLUSTER"] == cid]["P_SAN"].mean()
         avg_churn = df_all[df_all["CLUSTER"] == cid]["P_CHURN"].mean()
-        with cols[i]:
+        with seg_cols[i]:
             st.markdown(f"""<div class='mc' style='border-left-color:{ccolor}'>
-                <div class='mc-label'>Cluster #{cid}</div>
-                <div style='font-size:14px;font-weight:700;color:{ccolor};margin-bottom:4px'>{cname}</div>
-                <div style='font-size:22px;font-weight:700;color:#1A2B22'>{n}</div>
-                <div class='mc-sub'>{pct:.1f}% · SAN {avg_san:.0%} · churn {avg_churn:.0%}</div>
+                <div class='mc-label'>Segment {cid}</div>
+                <div style='font-size:13px;font-weight:700;color:{ccolor};margin-bottom:6px'>{cname}</div>
+                <div style='font-size:24px;font-weight:700;color:#1A2B22;line-height:1'>{n}</div>
+                <div class='mc-sub'>{pct:.1f}% of portfolio</div>
+                <div style='margin-top:10px;display:flex;gap:8px'>
+                    <span style='font-size:11px;background:{ccolor}15;color:{ccolor};padding:2px 8px;border-radius:20px;font-weight:700'>SAN {avg_san:.0%}</span>
+                    <span style='font-size:11px;background:#71809615;color:#718096;padding:2px 8px;border-radius:20px;font-weight:700'>Churn {avg_churn:.0%}</span>
+                </div>
             </div>""", unsafe_allow_html=True)
 
     st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
 
     col1, col2 = st.columns([1, 1], gap="large")
+
     with col1:
-        st.markdown("<div class='slabel'>Cluster descriptions & recommendations</div>", unsafe_allow_html=True)
+        st.markdown("<div class='slabel'>Segment profiles & intervention windows</div>", unsafe_allow_html=True)
+
+        # Real lifecycle positions from notebook
+        lifecycle_pos = {1: 53.5, 2: 36.8, 3: 48.6, 4: 56.4}
+
         for cid, (cname, ccolor, cdesc) in CLUSTER_PROFILES.items():
+            istart, iend, iaction, idesc = CLUSTER_INTERVENTION[cid]
+            lc = lifecycle_pos[cid]
+            bar_width = iend - istart
+
             st.markdown(f"""
-            <div style='display:flex;gap:12px;margin-bottom:12px;padding:12px;
-                        background:#F5F7FA;border-radius:8px;border-left:3px solid {ccolor}'>
-                <div style='font-size:17px;font-weight:700;color:{ccolor};min-width:26px'>#{cid}</div>
-                <div>
-                    <div style='font-size:13px;font-weight:700;color:#1A2B22'>{cname}</div>
-                    <div style='font-size:12px;color:#718096;margin-top:2px'>{cdesc}</div>
+            <div style='margin-bottom:16px;padding:14px 16px;background:#F8FAFB;
+                        border-radius:10px;border-left:3px solid {ccolor}'>
+                <div style='display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px'>
+                    <div>
+                        <span style='font-size:12px;font-weight:700;color:{ccolor}'>Segment {cid} · {cname}</span>
+                        <div style='font-size:11px;color:#718096;margin-top:2px'>{cdesc[:90]}…</div>
+                    </div>
+                    <span style='font-size:11px;background:{ccolor}18;color:{ccolor};padding:2px 9px;
+                                 border-radius:20px;font-weight:700;white-space:nowrap;margin-left:10px'>
+                        {iaction}
+                    </span>
+                </div>
+                <div style='font-size:10px;color:#718096;margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em'>
+                    Intervene {istart}–{iend}% of contract · current avg {lc:.0f}%
+                </div>
+                <div style='position:relative;height:8px;background:#E2E8F0;border-radius:4px;overflow:hidden'>
+                    <div style='position:absolute;left:{istart}%;width:{bar_width}%;height:100%;
+                                background:{ccolor};opacity:.75;border-radius:2px'></div>
+                    <div style='position:absolute;left:{lc}%;transform:translateX(-50%);top:0;
+                                width:3px;height:100%;background:{ccolor};opacity:1'></div>
+                </div>
+                <div style='display:flex;justify-content:space-between;font-size:10px;color:#A0AEC0;margin-top:2px'>
+                    <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
                 </div>
             </div>""", unsafe_allow_html=True)
+
     with col2:
-        st.markdown("<div class='slabel'>2D cluster visualisation — PCA / UMAP</div>", unsafe_allow_html=True)
-        st.markdown("""<div class='todo' style='height:360px;display:flex;flex-direction:column;
-                        align-items:center;justify-content:center;gap:8px'>
-            <div class='todo-t'>Scatter plot goes here</div>
-            <div class='todo-s'>Add after running PCA/UMAP on X_train_fs<br>
-            Colour by cluster · SAN/Churn probability overlay toggle</div>
+        st.markdown("<div class='slabel'>Early settlement & churn by segment</div>", unsafe_allow_html=True)
+
+        # Real rates from notebook (cells 41, 44)
+        seg_data = {
+            1: {"label": "Seg 1 · High Risk",          "color": "#E24B4A", "san": 25.5, "natural": 11.8, "total": 36.7},
+            2: {"label": "Seg 2 · High Value",          "color": "#378ADD", "san": 46.6, "natural":  7.4, "total": 51.9},
+            3: {"label": "Seg 3 · High Ext. Credit",    "color": "#1D9E75", "san": 26.9, "natural": 12.0, "total": 38.4},
+            4: {"label": "Seg 4 · Base / Dormant",      "color": "#BA7517", "san": 22.8, "natural": 21.1, "total": 43.5},
+        }
+
+        for cid, d in seg_data.items():
+            c = d["color"]
+            st.markdown(f"""
+            <div style='margin-bottom:14px'>
+              <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:5px'>
+                <span style='font-size:12px;font-weight:700;color:{c}'>{d["label"]}</span>
+                <span style='font-size:11px;color:#718096'>Total churn <b style='color:#1A2B22'>{d["total"]:.1f}%</b></span>
+              </div>
+              <div style='height:10px;background:#E2E8F0;border-radius:5px;overflow:hidden;position:relative'>
+                <div style='position:absolute;left:0;width:{d["san"]}%;height:100%;background:{c};opacity:.9'></div>
+                <div style='position:absolute;left:{d["san"]}%;width:{d["natural"]}%;height:100%;background:{c};opacity:.35'></div>
+              </div>
+              <div style='display:flex;gap:14px;font-size:11px;color:#718096;margin-top:4px'>
+                <span><b style='color:{c}'>■</b> Early SAN {d["san"]:.1f}%</span>
+                <span><b style='color:{c};opacity:.4'>■</b> Natural SOL {d["natural"]:.1f}%</span>
+              </div>
+            </div>""", unsafe_allow_html=True)
+
+        st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
+        st.markdown("<div class='slabel'>Methodology</div>", unsafe_allow_html=True)
+        st.markdown("""
+        <div style='font-size:12px;color:#718096;line-height:1.75'>
+            <b style='color:#2D3748'>Step 1 — 3-perspective K-Means</b> (k=3 each, silhouette-validated)<br>
+            &nbsp;&nbsp;· <b>P1 Financial</b>: N_CONTRACTS, TOTAL_MTFINO, MENSALIDADE, MEDIAN_DURDEG<br>
+            &nbsp;&nbsp;· <b>P2 Risk</b>: MONTVENC_LOG, RISK_EVER, RISK_RECENT, COUNT_CL, DIVIDAS<br>
+            &nbsp;&nbsp;· <b>P3 History</b>: CLIENT_SENIORITY_YEARS, YEARS_SINCE_LAST_CONTRACT, N_Dossiers<br><br>
+            <b style='color:#2D3748'>Step 2 — Ward hierarchical clustering</b> on combined P1_P2_P3 centroids<br>
+            &nbsp;&nbsp;→ Dendrogram cut at <b>n=4</b> (deeper cuts yield segments &lt;2% of base)
         </div>""", unsafe_allow_html=True)
 
     st.markdown("</div>", unsafe_allow_html=True)
