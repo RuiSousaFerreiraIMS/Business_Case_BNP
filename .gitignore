@@ -24,3 +24,6 @@ data/prepared/fama_clean.parquet
 /data/prepared/active_clients.parquet
 /data/prepared/active_clients_scored.parquet
 data/prepared/EDA_with_FE.parquet
+/data/prepared/customer.parquet
+data/prepared/customer_outliers.parquet
+data/prepared/EDA.parquet
