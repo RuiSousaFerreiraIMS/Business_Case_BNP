@@ -642,12 +642,17 @@ elif page == "Client Search":
                 <div class='gauge-label'>{'High risk' if p_churn>=0.6 else 'Moderate' if p_churn>=0.4 else 'Low risk'}</div>
             </div>""", unsafe_allow_html=True)
         with g3:
+            # Intervention window for this cluster
+            istart, iend, iaction, _ = CLUSTER_INTERVENTION.get(cl_id, (0, 100, "—", ""))
             st.markdown(f"""<div class='gauge-wrap'>
-                <div class='gauge-title'>Cluster</div>
-                <div style='font-size:18px;font-weight:700;color:{cl_color};margin-bottom:5px'>
-                    #{cl_id} · {cl_name}
+                <div class='gauge-title'>Segment</div>
+                <div style='font-size:16px;font-weight:700;color:{cl_color};margin-bottom:6px'>#{cl_id} · {cl_name}</div>
+                <div style='font-size:12px;color:#718096;line-height:1.5;margin-bottom:8px'>{cl_desc}</div>
+                <div style='font-size:10px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px'>Intervention window</div>
+                <div style='height:5px;background:#E2E8F0;border-radius:3px;overflow:hidden;position:relative'>
+                    <div style='position:absolute;left:{istart}%;width:{iend-istart}%;height:100%;background:{cl_color};opacity:.8;border-radius:2px'></div>
                 </div>
-                <div class='gauge-label'>{cl_desc[:72]}…</div>
+                <div style='font-size:11px;color:{cl_color};font-weight:600;margin-top:3px'>{istart}–{iend}% of contract · {iaction}</div>
             </div>""", unsafe_allow_html=True)
         with g4:
             st.markdown(f"""<div class='gauge-wrap'>
@@ -659,34 +664,71 @@ elif page == "Client Search":
             </div>""", unsafe_allow_html=True)
 
         st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
+
+        # ── Recommended action — split into WHAT + HOW ────────────────
         st.markdown("<div class='slabel'>Recommended action</div>", unsafe_allow_html=True)
         act_sty, act_col = action_style(action)
+
+        ACTION_STEPS = {
+            "Urgent restructuring":  ["Call the client within 48h", "Propose a debt renegotiation or instalment restructuring plan", "Escalate to senior relationship manager if no response"],
+            "Urgent retention":      ["Prioritise for immediate outreach — within 48h", "Prepare a personalised refinancing or retention offer", "Offer a new contract before the early settlement is triggered"],
+            "Debt monitoring":       ["Schedule a proactive check-in call this week", "Review recent payment history for early warning signals", "Flag for follow-up if no improvement within 30 days"],
+            "Refinancing offer":     ["Contact the client before mid-contract point", "Prepare a new loan offer aligned with their financial profile", "Highlight benefits of staying vs early settlement cost"],
+            "Upsell opportunity":    ["Include in next outreach cycle with a product expansion offer", "Review eligibility for credit line increase or complementary product", "Low urgency — plan for next quarterly review"],
+            "Competitive proposal":  ["Contact within 2 weeks with a targeted counter-offer", "Benchmark against competitor rates the client is likely using", "Focus on consolidation benefits and simplifying their credit portfolio"],
+            "Consolidation offer":   ["Identify the external credit lines the client holds", "Prepare a consolidation proposal to bring external debt to Cetelem", "Emphasise lower total monthly payments and single provider convenience"],
+            "Renewal campaign":      ["Include in end-of-contract renewal campaign", "Contact 60–90 days before contract maturity", "Offer an incentive for early renewal commitment"],
+            "Cross-sell":            ["Include in next product campaign cycle", "Review profile for complementary product eligibility", "Low urgency — stable client, no immediate risk"],
+            "Monitor":               ["No immediate contact needed", "Include in standard monitoring dashboard", "Reassess at next quarterly review"],
+            "Standard follow-up":    ["Include in standard periodic review cycle", "No immediate action required"],
+        }
+
+        steps = ACTION_STEPS.get(action, ["Review client profile and determine appropriate next step"])
+        steps_html = "".join([f"<div style='display:flex;gap:10px;margin-bottom:6px;align-items:flex-start'><span style='color:{act_col};font-weight:700;font-size:14px;line-height:1.2'>→</span><span style='font-size:13px;color:#2D3748;line-height:1.5'>{s}</span></div>" for s in steps])
+
         st.markdown(f"""<div class='action-card {act_sty}'>
-            <div class='action-title' style='color:{act_col}'>{action}</div>
-            <div class='action-desc'>{action_description(action, p_san, p_churn, cl_id)}</div>
+            <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'>
+                <div class='action-title' style='color:{act_col};margin-bottom:0'>{action}</div>
+                <span style='font-size:11px;background:{act_col}18;color:{act_col};padding:2px 10px;border-radius:20px;font-weight:700;white-space:nowrap'>Segment {cl_id} · {cl_name}</span>
+            </div>
+            <div class='action-desc' style='margin-bottom:12px'>{action_description(action, p_san, p_churn, cl_id)}</div>
+            <div style='border-top:1px solid {act_col}22;padding-top:10px'>
+                <div style='font-size:10px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px'>Next steps</div>
+                {steps_html}
+            </div>
         </div>""", unsafe_allow_html=True)
 
         st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
+
+        # ── Client details — enriched ─────────────────────────────────
         st.markdown("<div class='slabel'>Client details</div>", unsafe_allow_html=True)
-        detail_cols = ["MENSALIDADE", "REMAINING_TERM_MONTHS", "TYPEPROD", "PRODALP", "sdem_age"]
-        available   = [c for c in detail_cols if c in client.index]
-        if available:
-            labels = {
-                "MENSALIDADE": "Monthly instalment",
-                "REMAINING_TERM_MONTHS": "Remaining term (mo.)",
-                "TYPEPROD": "Product type", "PRODALP": "Product", "sdem_age": "Age",
-            }
-            dcols = st.columns(len(available))
-            for di, col_name in enumerate(available):
-                val   = client[col_name]
-                label = labels.get(col_name, col_name)
-                if isinstance(val, (float, np.floating)):
-                    val = f"€{val:,.2f}" if "MENSAL" in col_name else f"{val:.1f}"
-                with dcols[di]:
-                    st.markdown(f"""<div class='mc'>
-                        <div class='mc-label'>{label}</div>
-                        <div style='font-size:17px;font-weight:700;color:#1A2B22'>{val}</div>
-                    </div>""", unsafe_allow_html=True)
+
+        detail_map = {
+            "PRODALP":            ("Product",              lambda v: str(v)),
+            "sdem_age":           ("Age",                  lambda v: f"{int(v)} yrs"),
+            "N_CONTRACTS":        ("Contracts",            lambda v: str(int(v))),
+            "TOTAL_MTFINO":       ("Total loan amount",    lambda v: f"€{v:,.0f}"),
+            "TOTAL_MENSALIDADE":  ("Monthly instalment",   lambda v: f"€{v:,.0f}"),
+            "MEDIAN_DURDEG":      ("Contract duration",    lambda v: f"{int(v)} mo."),
+            "MEDIAN_RESSO":       ("Est. monthly income",  lambda v: f"€{v:,.0f}"),
+            "NBENF":              ("Dependents",           lambda v: str(int(v))),
+            "ALLBD_N_Dossiers__N":("Dossiers (history)",   lambda v: str(int(v))),
+            "COUNT_TOTAL_MEDIAN": ("External credit lines",lambda v: str(int(v))),
+        }
+
+        available_details = [(label, fmt(client[col])) for col, (label, fmt) in detail_map.items() if col in client.index and pd.notna(client[col])]
+
+        if available_details:
+            cols_per_row = 5
+            for row_start in range(0, len(available_details), cols_per_row):
+                row_items = available_details[row_start:row_start + cols_per_row]
+                dcols = st.columns(len(row_items))
+                for di, (label, val) in enumerate(row_items):
+                    with dcols[di]:
+                        st.markdown(f"""<div class='mc'>
+                            <div class='mc-label'>{label}</div>
+                            <div style='font-size:16px;font-weight:700;color:#1A2B22'>{val}</div>
+                        </div>""", unsafe_allow_html=True)
 
     else:
         # ── Filter bar ────────────────────────────────────────────────
