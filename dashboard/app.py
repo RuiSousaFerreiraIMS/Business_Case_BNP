@@ -261,13 +261,105 @@ html, body, [class*="css"], .stApp {
     box-shadow: 0 0 0 3px rgba(0,145,90,.1) !important;
 }
 
-/* ── Checkbox label ── */
-[data-testid="stCheckbox"] label {
+/* ── Checkbox ── */
+[data-testid="stCheckbox"] label span,
+[data-testid="stCheckbox"] label p,
+[data-testid="stCheckbox"] p {
+    color: #1A2B22 !important;
+}
+
+/* ── Expander ── */
+[data-testid="stExpander"] {
+    border: 1.5px solid #E2E8F0 !important;
+    border-radius: 10px !important;
+    background: #FFFFFF !important;
+}
+[data-testid="stExpander"] summary {
     font-size: 13px !important;
+    font-weight: 600 !important;
     color: #2D3748 !important;
+    padding: 10px 14px !important;
+}
+[data-testid="stExpander"] summary:hover {
+    color: #00915A !important;
+    background: #F0FBF7 !important;
+    border-radius: 8px !important;
+}
+[data-testid="stExpander"] summary svg {
+    color: #718096 !important;
+}
+
+/* ── Override Streamlit theme variables ── */
+:root {
+    --primary-color: #00915A !important;
+    --primary-color-rgb: 0, 145, 90 !important;
+}
+
+/* ── Sliders — green thumb & track ── */
+[data-testid="stSlider"] > div > div > div > div {
+    background: #00915A !important;
+}
+[data-testid="stSlider"] [role="slider"] {
+    background: #00915A !important;
+    border-color: #00915A !important;
+    box-shadow: 0 0 0 3px rgba(0,145,90,.15) !important;
+}
+[data-testid="stSlider"] [role="slider"]:focus {
+    box-shadow: 0 0 0 4px rgba(0,145,90,.25) !important;
+}
+/* Track fill */
+[data-testid="stSlider"] div[data-baseweb="slider"] div div:nth-child(3) {
+    background: #00915A !important;
+}
+/* ALL text/labels inside slider — overrides Streamlit's red with grey */
+[data-testid="stSlider"] p,
+[data-testid="stSlider"] span,
+[data-testid="stSlider"] div[data-testid="stTickBarMin"],
+[data-testid="stSlider"] div[data-testid="stTickBarMax"],
+[data-testid="stSlider"] [data-testid="stThumbValue"],
+[data-testid="stSlider"] div[class*="StyledThumbValue"],
+[data-testid="stSlider"] div[class*="thumbValue"],
+[data-testid="stSlider"] > div > div > p {
+    color: #718096 !important;
+    font-size: 12px !important;
     font-weight: 500 !important;
 }
-[data-testid="stCheckbox"] label:hover {
+/* Tooltip bubble while dragging */
+[data-baseweb="tooltip"] div {
+    background: #1A2B22 !important;
+    color: #FFFFFF !important;
+    font-size: 11px !important;
+    border-radius: 6px !important;
+}
+
+/* ── Multiselect ── */
+[data-testid="stMultiSelect"] > div > div {
+    border: 1.5px solid #E2E8F0 !important;
+    border-radius: 8px !important;
+    font-size: 13px !important;
+    min-height: 42px !important;
+    background: #FFFFFF !important;
+}
+[data-testid="stMultiSelect"] > div > div:focus-within {
+    border-color: #00915A !important;
+    box-shadow: 0 0 0 3px rgba(0,145,90,.1) !important;
+}
+/* Tags (selected items) */
+[data-testid="stMultiSelect"] span[data-baseweb="tag"] {
+    background: #E8F5EE !important;
+    color: #00693E !important;
+    border-radius: 20px !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    border: none !important;
+}
+/* Tag close × */
+[data-testid="stMultiSelect"] span[data-baseweb="tag"] span[role="presentation"] svg {
+    fill: #00693E !important;
+}
+/* Dropdown options hover */
+[data-testid="stMultiSelect"] li:hover {
+    background: #F0FBF7 !important;
     color: #00915A !important;
 }
 
@@ -311,39 +403,39 @@ def action_description(action, p_san=None, p_churn=None, cluster=None):
     san_str   = f"{p_san:.0%}"   if p_san   is not None else "—"
     churn_str = f"{p_churn:.0%}" if p_churn is not None else "—"
     return {
-        "Urgent restructuring":  f"Delinquency risk is critical (P(Churn)={churn_str}). Contact immediately to renegotiate debt terms before the client defaults or exits.",
-        "Urgent retention":      f"High-value client at serious risk — P(SAN)={san_str} and P(Churn)={churn_str}. Offer a retention incentive or restructured product before they act.",
-        "Debt monitoring":       f"Financial stress signals detected (P(Churn)={churn_str}). Schedule a proactive outreach call — intervene before delinquency escalates.",
-        "Refinancing offer":     f"Client likely to settle early (P(SAN)={san_str}) but low churn risk — they want to stay. Contact with a refinancing offer before the decision is made.",
-        "Upsell opportunity":    f"Stable high-value client — P(SAN)={san_str}, P(Churn)={churn_str}. Good moment to propose a new product or credit line expansion.",
-        "Competitive proposal":  f"Significant external credit exposure with P(Churn)={churn_str}. Present a counter-proposal before the client migrates to a competitor.",
-        "Consolidation offer":   f"Client spreads credit across multiple providers (P(SAN)={san_str}). Offer debt consolidation to increase share of wallet at Cetelem.",
-        "Renewal campaign":      f"Contract nearing end — P(Churn)={churn_str}. No financial pressure detected. Target with a renewal offer before natural exit.",
-        "Cross-sell":            f"Stable and low-risk client — P(SAN)={san_str}, P(Churn)={churn_str}. Good moment to introduce a complementary product.",
-        "Monitor":               f"No immediate action required. P(Churn)={churn_str} — monitor for changes in financial behaviour.",
+        "Urgent restructuring":  f"Delinquency risk is critical (Churn prob.={churn_str}). Contact immediately to renegotiate debt terms before the client defaults or exits.",
+        "Urgent retention":      f"High-value client at serious risk — Early settlement prob.={san_str} and Churn prob.={churn_str}. Offer a retention incentive or restructured product before they act.",
+        "Debt monitoring":       f"Financial stress signals detected (Churn prob.={churn_str}). Schedule a proactive outreach call — intervene before delinquency escalates.",
+        "Refinancing offer":     f"Client likely to settle early (Early settlement prob.={san_str}) but low churn risk — they want to stay. Contact with a refinancing offer before the decision is made.",
+        "Upsell opportunity":    f"Stable high-value client — Early settlement prob.={san_str}, Churn prob.={churn_str}. Good moment to propose a new product or credit line expansion.",
+        "Competitive proposal":  f"Significant external credit exposure with Churn prob.={churn_str}. Present a counter-proposal before the client migrates to a competitor.",
+        "Consolidation offer":   f"Client spreads credit across multiple providers (Early settlement prob.={san_str}). Offer debt consolidation to increase share of wallet at Cetelem.",
+        "Renewal campaign":      f"Contract nearing end — Churn prob.={churn_str}. No financial pressure detected. Target with a renewal offer before natural exit.",
+        "Cross-sell":            f"Stable and low-risk client — Early settlement prob.={san_str}, Churn prob.={churn_str}. Good moment to introduce a complementary product.",
+        "Monitor":               f"No immediate action required. Churn prob.={churn_str} — monitor for changes in financial behaviour.",
         "Standard follow-up":    f"No immediate action required. Include in standard periodic review cycle.",
     }.get(action, "—")
 
 CLUSTER_PROFILES = {
-    1: ("High Risk / Overdue",    "#E24B4A", "Significant overdue amounts and recent delinquency signals (MONTVENC, RISK_EVER). Churn 36.7% — mixed early and natural exits."),
-    2: ("High Value",             "#378ADD", "Multiple high-value contracts, highest income and LTI=24. Early settlement rate 46.6% — by far the highest of all segments."),
-    3: ("High External Credit",   "#1D9E75", "High external consumer credit and total debt. Moderate churn 38.4%, spreading credit across competing providers."),
-    4: ("Base / Dormant",         "#BA7517", "Low engagement, passive exits. Natural churn dominates (21.1%). Complete contracts but do not renew — largest segment (50%)."),
+    1: ("High Risk / Overdue",    "#E24B4A", "Significant overdue amounts and recent delinquency signals (MONTVENC_LOG=6.30, RISK_EVER=0.38). Total churn 29.0% — balanced mix of early (18.7%) and natural (10.3%) exits driven by financial distress. LTI=16.3 reflects heavy debt burden."),
+    2: ("High Value",             "#378ADD", "Multiple high-value contracts, highest income and LTI=24. Early settlement rate 46.6% — by far the highest of all segments. Lowest total churn (21.1%): when they settle early, they refinance and stay."),
+    3: ("High External Credit",   "#1D9E75", "Highest external credit exposure and active debt across competing providers. Highest early churn rate (21.4%) — active rate shoppers exiting mid-contract to competitors. Total churn 31.3%."),
+    4: ("Base / Dormant",         "#BA7517", "Low engagement, passive exits. Highest total churn (38.1%) driven by natural attrition (19.2%). Complete contracts but do not renew — largest segment (48.3%)."),
 }
 
 # Intervention windows (start%, end% of contract lifecycle) + action per segment
 CLUSTER_INTERVENTION = {
-    1: (25, 75,  "Recovery restructuring",  "Debt renegotiation and restructuring before delinquency escalates further."),
-    2: (25, 50,  "Refinancing offer",       "New contract or refinancing proposal before the early settlement decision is made. LTI=24 confirms financial capacity."),
-    3: (50, 75,  "Competitive proposal",    "Address external credit alternatives. Client manages multiple providers — offer a compelling counter-proposal."),
-    4: (75, 100, "Renewal campaign",        "Cross-sell and renewal offer in the final quarter, before natural contract end."),
+    1: (50, 75,  "Recovery restructuring",  "Debt renegotiation and restructuring before delinquency escalates further. 28.1% of clients already in final quarter."),
+    2: (25, 40,  "Refinancing offer",       "Intercept before 40% lifecycle milestone with a proactive refinancing proposal. LTI=24 confirms financial capacity and strategic credit use."),
+    3: (40, 60,  "Competitive proposal",    "Address external credit alternatives mid-contract. Highest early churn (21.4%) — client is actively rate-shopping and can be retained with a consolidation offer."),
+    4: (75, 100, "Renewal campaign",        "Automated renewal and cross-sell campaigns triggered at the 75% mark to prevent passive attrition. 36.9% already in final quarter."),
 }
 
 # Table column config for Client Search
 TABLE_COLS = {
     "CONTRIB":          "Client ID",
-    "P_SAN":            "P(Early Settlement)",
-    "P_CHURN":          "P(Churn)",
+    "P_SAN":            "Early Settlement Prob.",
+    "P_CHURN":          "Churn Prob.",
     "CLUSTER":          "Cluster",
     "ACTION":           "Action",
     "REVENUE_AT_RISK":  "Revenue at risk",
@@ -416,9 +508,9 @@ def load_data():
         # ── Synthetic data ──────────────────────────────────────────────
         rng = np.random.default_rng(42)
         n = 150
-        cluster = rng.choice([1, 2, 3, 4], n, p=[0.20, 0.16, 0.14, 0.50])
-        cluster_san_base   = {1: 0.255, 2: 0.466, 3: 0.269, 4: 0.228}
-        cluster_churn_base = {1: 0.367, 2: 0.519, 3: 0.384, 4: 0.435}
+        cluster = rng.choice([1, 2, 3, 4], n, p=[0.199, 0.157, 0.161, 0.483])
+        cluster_san_base   = {1: 0.255, 2: 0.466, 3: 0.269, 4: 0.226}
+        cluster_churn_base = {1: 0.290, 2: 0.211, 3: 0.313, 4: 0.381}
         p_san   = np.clip([cluster_san_base[c]   + rng.normal(0, 0.10) for c in cluster], 0.02, 0.98)
         p_churn = np.clip([cluster_churn_base[c] + rng.normal(0, 0.10) for c in cluster], 0.02, 0.98)
         total_mtfino   = np.round(rng.uniform(5000, 30000, n), 2)
@@ -498,12 +590,12 @@ if page == "Portfolio Overview":
         <div class="mc green">
             <div class="mc-label">Early settlement risk</div>
             <div class="mc-value green">{n_san_risk:,}</div>
-            <div class="mc-sub">P(SAN) ≥ 60%</div>
+            <div class="mc-sub">Early settlement prob. ≥ 60%</div>
         </div>
         <div class="mc red">
             <div class="mc-label">Churn risk</div>
             <div class="mc-value red">{n_churn_risk:,}</div>
-            <div class="mc-sub">P(Churn) ≥ 60%</div>
+            <div class="mc-sub">Churn probability ≥ 60%</div>
         </div>
         <div class="mc amber">
             <div class="mc-label">Revenue at risk</div>
@@ -512,7 +604,7 @@ if page == "Portfolio Overview":
         </div>
     </div>""", unsafe_allow_html=True)
 
-    col1, col2 = st.columns([1.2, 1], gap="large")
+    col1, col2 = st.columns([1, 1.3], gap="large")
 
     with col1:
         st.markdown("<div class='slabel'>Action priority breakdown</div>", unsafe_allow_html=True)
@@ -526,7 +618,7 @@ if page == "Portfolio Overview":
             "Cross-sell", "Monitor", "Standard follow-up",
         ]
         action_counts["Action"] = pd.Categorical(action_counts["Action"], categories=priority_order, ordered=True)
-        action_counts = action_counts.sort_values("Action")
+        action_counts = action_counts.sort_values("Action").reset_index(drop=True)
         colors = {
             "Urgent restructuring": "#C0392B",
             "Urgent retention": "#C0392B",
@@ -540,19 +632,35 @@ if page == "Portfolio Overview":
             "Monitor": "#B7791F",
             "Standard follow-up": "#718096",
         }
-        for _, row in action_counts.iterrows():
+
+        # Split into two side-by-side columns inside col1
+        half = (len(action_counts) + 1) // 2
+        left_rows  = action_counts.iloc[:half]
+        right_rows = action_counts.iloc[half:]
+
+        def action_bar_html(row, n_total, colors):
             pct = row["Clients"] / n_total * 100
             c   = colors.get(row["Action"], "#718096")
-            st.markdown(f"""
-            <div style='margin-bottom:11px'>
-              <div style='display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px'>
+            return f"""
+            <div style='margin-bottom:13px'>
+              <div style='display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px'>
                 <span style='font-weight:600;color:{c}'>{row["Action"]}</span>
-                <span style='color:#718096'>{row["Clients"]} clients · {pct:.1f}%</span>
               </div>
-              <div style='height:7px;background:#E2E8F0;border-radius:4px;overflow:hidden'>
-                <div style='height:100%;width:{pct}%;background:{c};border-radius:4px'></div>
+              <div style='display:flex;align-items:center;gap:8px'>
+                <div style='flex:1;height:6px;background:#E2E8F0;border-radius:3px;overflow:hidden'>
+                  <div style='height:100%;width:{pct:.1f}%;background:{c};border-radius:3px'></div>
+                </div>
+                <span style='font-size:11px;color:#718096;white-space:nowrap;min-width:90px;text-align:right'>{row["Clients"]:,} · {pct:.1f}%</span>
               </div>
-            </div>""", unsafe_allow_html=True)
+            </div>"""
+
+        bcol1, bcol2 = st.columns(2, gap="medium")
+        with bcol1:
+            for _, row in left_rows.iterrows():
+                st.markdown(action_bar_html(row, n_total, colors), unsafe_allow_html=True)
+        with bcol2:
+            for _, row in right_rows.iterrows():
+                st.markdown(action_bar_html(row, n_total, colors), unsafe_allow_html=True)
 
     with col2:
         st.markdown("<div class='slabel'>Top 10 clients by revenue at risk</div>", unsafe_allow_html=True)
@@ -561,15 +669,22 @@ if page == "Portfolio Overview":
         for _, r in top10.iterrows():
             sc = "#00915A" if r["P_SAN"] >= 0.6 else "#718096"
             cc = "#C0392B" if r["P_CHURN"] >= 0.6 else "#718096"
+            contrib = str(r['CONTRIB'])
+            contrib_short = contrib[:18] + "…" if len(contrib) > 18 else contrib
             rows_html += f"""<tr>
-                <td style='font-weight:600'>{r['CONTRIB']}</td>
-                <td style='color:{sc};font-weight:600'>{r['P_SAN']:.0%}</td>
-                <td style='color:{cc};font-weight:600'>{r['P_CHURN']:.0%}</td>
-                <td style='font-weight:600'>€{r['REVENUE_AT_RISK']:,.0f}</td>
+                <td style='font-weight:600;font-size:12px' title='{contrib}'>{contrib_short}</td>
+                <td style='color:{sc};font-weight:700;text-align:center'>{r['P_SAN']:.0%}</td>
+                <td style='color:{cc};font-weight:700;text-align:center'>{r['P_CHURN']:.0%}</td>
+                <td style='font-weight:600;text-align:right'>€{r['REVENUE_AT_RISK']:,.0f}</td>
             </tr>"""
         st.markdown(f"""
         <table class='ctable'>
-          <thead><tr><th>Client</th><th>P(SAN)</th><th>P(Churn)</th><th>Revenue at risk</th></tr></thead>
+          <thead><tr>
+            <th>Client</th>
+            <th style='text-align:center' title='Early settlement probability'>Early sett. prob.</th>
+            <th style='text-align:center' title='Churn probability'>Churn prob.</th>
+            <th style='text-align:right'>Revenue at risk</th>
+          </tr></thead>
           <tbody>{rows_html}</tbody>
         </table>""", unsafe_allow_html=True)
 
@@ -625,7 +740,7 @@ elif page == "Client Search":
         g1, g2, g3, g4 = st.columns(4, gap="medium")
         with g1:
             st.markdown(f"""<div class='gauge-wrap'>
-                <div class='gauge-title'>P(Early Settlement)</div>
+                <div class='gauge-title'>Early Settlement Prob.</div>
                 <div class='gauge-value' style='color:{san_color}'>{p_san:.0%}</div>
                 <div class='gauge-bar-track'>
                   <div class='gauge-bar-fill' style='width:{p_san*100:.0f}%;background:{san_color}'></div>
@@ -634,7 +749,7 @@ elif page == "Client Search":
             </div>""", unsafe_allow_html=True)
         with g2:
             st.markdown(f"""<div class='gauge-wrap'>
-                <div class='gauge-title'>P(Churn)</div>
+                <div class='gauge-title'>Churn Probability</div>
                 <div class='gauge-value' style='color:{churn_color}'>{p_churn:.0%}</div>
                 <div class='gauge-bar-track'>
                   <div class='gauge-bar-fill' style='width:{p_churn*100:.0f}%;background:{churn_color}'></div>
@@ -731,39 +846,38 @@ elif page == "Client Search":
                         </div>""", unsafe_allow_html=True)
 
     else:
-        # ── Filter bar ────────────────────────────────────────────────
-        ACTION_OPTIONS = [
-            "All actions", "Urgent restructuring", "Urgent retention",
-            "Debt monitoring", "Refinancing offer", "Upsell opportunity",
-            "Competitive proposal", "Consolidation offer",
-            "Renewal campaign", "Cross-sell", "Standard follow-up", "Monitor",
-        ]
-        RISK_OPTIONS = [
-            "All clients", "High SAN risk (≥ 60%)", "High churn risk (≥ 60%)", "Both high risk",
-        ]
+        # ── Sort options ──────────────────────────────────────────────
         SORT_MAP = {
-            "Revenue at risk ↓":   ("REVENUE_AT_RISK", False),
-            "P(Settlement) ↓":     ("P_SAN",           False),
-            "P(Churn) ↓":          ("P_CHURN",         False),
-            "Client ID ↑":         ("CONTRIB",         True),
+            "Revenue at risk ↓":          ("REVENUE_AT_RISK", False),
+            "Early Settlement Prob. ↓":   ("P_SAN",           False),
+            "Churn Prob. ↓":              ("P_CHURN",         False),
+            "Client ID ↑":                ("CONTRIB",         True),
+        }
+        ACTION_ALL = [
+            "Urgent restructuring", "Urgent retention", "Debt monitoring",
+            "Refinancing offer", "Upsell opportunity", "Competitive proposal",
+            "Consolidation offer", "Renewal campaign", "Cross-sell",
+            "Monitor", "Standard follow-up",
+        ]
+        CLUSTER_ALL = [1, 2, 3, 4]
+        CLUSTER_LABELS = {
+            1: "Seg 1 · High Risk",
+            2: "Seg 2 · High Value",
+            3: "Seg 3 · High Ext. Credit",
+            4: "Seg 4 · Base / Dormant",
         }
 
-        fc1, fc2, fc3, fc4, fc5 = st.columns([2.5, 1.8, 1.8, 1.8, 1.5])
-        with fc1:
+        # ── Top bar: search + sort always visible ──────────────────────
+        sb1, sb2, sb3 = st.columns([3, 1.5, 1.5])
+        with sb1:
             search_q = st.text_input(
                 "search", placeholder="🔍  Search by Client ID…",
                 label_visibility="collapsed", key="search_input",
             )
-        with fc2:
-            action_f = st.selectbox("Action", ACTION_OPTIONS,
-                                    label_visibility="collapsed", key="action_f")
-        with fc3:
-            risk_f = st.selectbox("Risk", RISK_OPTIONS,
-                                  label_visibility="collapsed", key="risk_f")
-        with fc4:
+        with sb2:
             sort_f = st.selectbox("Sort by", list(SORT_MAP.keys()),
                                   label_visibility="collapsed", key="sort_f")
-        with fc5:
+        with sb3:
             hide_unassigned = st.checkbox(
                 "Hide unassigned clusters",
                 value=st.session_state.hide_unassigned,
@@ -771,30 +885,81 @@ elif page == "Client Search":
             )
             st.session_state.hide_unassigned = hide_unassigned
 
+        # ── Advanced filters expander ──────────────────────────────────
+        with st.expander("⚙  Filters", expanded=False):
+            ef1, ef2, ef3 = st.columns([1.2, 1.2, 1.6])
+
+            with ef1:
+                st.markdown("<div style='font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px'>Early Settlement Prob.</div>", unsafe_allow_html=True)
+                san_range = st.slider(
+                    "san_range", 0, 100, (0, 100), step=5,
+                    format="%d%%", label_visibility="collapsed", key="san_slider",
+                )
+
+                st.markdown("<div style='font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.07em;margin-top:12px;margin-bottom:6px'>Churn Probability</div>", unsafe_allow_html=True)
+                churn_range = st.slider(
+                    "churn_range", 0, 100, (0, 100), step=5,
+                    format="%d%%", label_visibility="collapsed", key="churn_slider",
+                )
+
+            with ef2:
+                st.markdown("<div style='font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px'>Segment</div>", unsafe_allow_html=True)
+                cluster_sel = st.multiselect(
+                    "cluster_sel",
+                    options=CLUSTER_ALL,
+                    default=CLUSTER_ALL,
+                    format_func=lambda x: CLUSTER_LABELS[x],
+                    label_visibility="collapsed",
+                    key="cluster_ms",
+                )
+
+            with ef3:
+                st.markdown("<div style='font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px'>Recommended Action</div>", unsafe_allow_html=True)
+                action_sel = st.multiselect(
+                    "action_sel",
+                    options=ACTION_ALL,
+                    default=ACTION_ALL,
+                    label_visibility="collapsed",
+                    key="action_ms",
+                )
+
         # ── Apply filters ─────────────────────────────────────────────
         results = df_all.copy()
         if hide_unassigned:
             results = results[results["CLUSTER"] != 0]
         if search_q:
             results = results[results["CONTRIB"].astype(str).str.contains(search_q, case=False, na=False)]
-        if action_f != "All actions":
-            results = results[results["ACTION"] == action_f]
-        if risk_f == "High SAN risk (≥ 60%)":
-            results = results[results["P_SAN"] >= 0.6]
-        elif risk_f == "High churn risk (≥ 60%)":
-            results = results[results["P_CHURN"] >= 0.6]
-        elif risk_f == "Both high risk":
-            results = results[(results["P_SAN"] >= 0.6) & (results["P_CHURN"] >= 0.6)]
+
+        # Probability range sliders
+        results = results[
+            (results["P_SAN"]   >= san_range[0]   / 100) &
+            (results["P_SAN"]   <= san_range[1]   / 100) &
+            (results["P_CHURN"] >= churn_range[0] / 100) &
+            (results["P_CHURN"] <= churn_range[1] / 100)
+        ]
+
+        # Segment multiselect
+        if cluster_sel:
+            results = results[results["CLUSTER"].isin(cluster_sel)]
+        else:
+            results = results.iloc[0:0]  # nothing selected = empty
+
+        # Action multiselect
+        if len(action_sel) < len(ACTION_ALL):
+            results = results[results["ACTION"].isin(action_sel)]
 
         sort_col_name, sort_asc_val = SORT_MAP[sort_f]
         if sort_col_name in results.columns:
             results = results.sort_values(sort_col_name, ascending=sort_asc_val)
 
         # Reset to page 0 when filters change
+        filter_state = (search_q, sort_f, hide_unassigned,
+                        san_range, churn_range,
+                        tuple(sorted(cluster_sel)), tuple(sorted(action_sel)))
         if "last_filter_state" not in st.session_state or \
-           st.session_state.last_filter_state != (search_q, action_f, risk_f, sort_f, hide_unassigned):
+           st.session_state.last_filter_state != filter_state:
             st.session_state.page_num = 0
-            st.session_state.last_filter_state = (search_q, action_f, risk_f, sort_f, hide_unassigned)
+            st.session_state.last_filter_state = filter_state
 
         # ── Pagination config ──────────────────────────────────────────
         PAGE_SIZE   = 50
@@ -849,11 +1014,11 @@ elif page == "Client Search":
         else:
             # ── Table header ──────────────────────────────────────────
             st.markdown("""
-            <div style='display:grid;grid-template-columns:2fr 0.8fr 0.8fr 1.2fr 1.8fr 1.1fr 0.5fr;
+            <div style='display:grid;grid-template-columns:2fr 0.9fr 0.8fr 1.2fr 1.8fr 1.1fr 0.5fr;
                         padding:8px 4px;border-bottom:2px solid #E2E8F0;gap:0'>
                 <div style='font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.06em'>Client ID</div>
-                <div style='font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.06em'>P(SAN)</div>
-                <div style='font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.06em'>P(Churn)</div>
+                <div style='font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.06em'>Early sett. prob.</div>
+                <div style='font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.06em'>Churn prob.</div>
                 <div style='font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.06em'>Cluster</div>
                 <div style='font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.06em'>Recommended action</div>
                 <div style='font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.06em'>Rev. at risk</div>
@@ -877,7 +1042,7 @@ elif page == "Client Search":
                 row_col, btn_col = st.columns([11.5, 0.5], gap="small")
                 with row_col:
                     st.markdown(f"""
-                    <div style='display:grid;grid-template-columns:2fr 0.8fr 0.8fr 1.2fr 1.8fr 1.1fr;
+                    <div style='display:grid;grid-template-columns:2fr 0.9fr 0.8fr 1.2fr 1.8fr 1.1fr;
                                 padding:9px 4px;background:{row_bg};border-bottom:1px solid #F0F2F5;
                                 align-items:center;gap:0'>
                         <div style='font-weight:700;font-size:13px;color:#1A2B22' title='{contrib}'>{contrib_short}</div>
@@ -902,7 +1067,7 @@ elif page == "Client Search":
 elif page == "Clustering":
     st.markdown("<div class='page-body'>", unsafe_allow_html=True)
     st.markdown("<div class='page-title'>Client Clustering</div>", unsafe_allow_html=True)
-    st.markdown("<div class='page-desc'>4 segments via multi-perspective K-Means (P1 Financial · P2 Risk · P3 History) + Ward hierarchical merging on centroids.</div>", unsafe_allow_html=True)
+    st.markdown("<div class='page-desc'>4 segments via multi-perspective K-Means (P1 Financial · P2 Risk · P3 History) + Ward hierarchical merging on centroids. Profiled across lifecycle position, LTI, churn type, and professional distribution.</div>", unsafe_allow_html=True)
 
     # ── Segment summary cards ──────────────────────────────────────────
     cluster_counts = df_all["CLUSTER"].value_counts().sort_index()
@@ -918,9 +1083,9 @@ elif page == "Clustering":
                 <div style='font-size:13px;font-weight:700;color:{ccolor};margin-bottom:6px'>{cname}</div>
                 <div style='font-size:24px;font-weight:700;color:#1A2B22;line-height:1'>{n}</div>
                 <div class='mc-sub'>{pct:.1f}% of portfolio</div>
-                <div style='margin-top:10px;display:flex;gap:8px'>
-                    <span style='font-size:11px;background:{ccolor}15;color:{ccolor};padding:2px 8px;border-radius:20px;font-weight:700'>SAN {avg_san:.0%}</span>
-                    <span style='font-size:11px;background:#71809615;color:#718096;padding:2px 8px;border-radius:20px;font-weight:700'>Churn {avg_churn:.0%}</span>
+                <div style='margin-top:10px;display:flex;gap:8px;flex-wrap:wrap'>
+                    <span style='font-size:11px;background:{ccolor}15;color:{ccolor};padding:2px 8px;border-radius:20px;font-weight:700'>Early settlement {avg_san:.0%}</span>
+                    <span style='font-size:11px;background:#71809615;color:#718096;padding:2px 8px;border-radius:20px;font-weight:700'>Churn prob. {avg_churn:.0%}</span>
                 </div>
             </div>""", unsafe_allow_html=True)
 
@@ -931,8 +1096,8 @@ elif page == "Clustering":
     with col1:
         st.markdown("<div class='slabel'>Segment profiles & intervention windows</div>", unsafe_allow_html=True)
 
-        # Real lifecycle positions from notebook
-        lifecycle_pos = {1: 53.5, 2: 36.8, 3: 48.6, 4: 56.4}
+        # Real lifecycle positions from notebook (cell 51)
+        lifecycle_pos = {1: 53.5, 2: 36.8, 3: 49.0, 4: 56.6}
 
         for cid, (cname, ccolor, cdesc) in CLUSTER_PROFILES.items():
             istart, iend, iaction, idesc = CLUSTER_INTERVENTION[cid]
@@ -943,9 +1108,9 @@ elif page == "Clustering":
             <div style='margin-bottom:16px;padding:14px 16px;background:#F8FAFB;
                         border-radius:10px;border-left:3px solid {ccolor}'>
                 <div style='display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px'>
-                    <div>
+                    <div style='flex:1;min-width:0'>
                         <span style='font-size:12px;font-weight:700;color:{ccolor}'>Segment {cid} · {cname}</span>
-                        <div style='font-size:11px;color:#718096;margin-top:2px'>{cdesc[:90]}…</div>
+                        <div style='font-size:11px;color:#718096;margin-top:4px;line-height:1.6'>{cdesc}</div>
                     </div>
                     <span style='font-size:11px;background:{ccolor}18;color:{ccolor};padding:2px 9px;
                                  border-radius:20px;font-weight:700;white-space:nowrap;margin-left:10px'>
@@ -969,12 +1134,12 @@ elif page == "Clustering":
     with col2:
         st.markdown("<div class='slabel'>Early settlement & churn by segment</div>", unsafe_allow_html=True)
 
-        # Real rates from notebook (cells 41, 44)
+        # Real rates from notebook cells 42, 44, 47
         seg_data = {
-            1: {"label": "Seg 1 · High Risk",          "color": "#E24B4A", "san": 25.5, "natural": 11.8, "total": 36.7},
-            2: {"label": "Seg 2 · High Value",          "color": "#378ADD", "san": 46.6, "natural":  7.4, "total": 51.9},
-            3: {"label": "Seg 3 · High Ext. Credit",    "color": "#1D9E75", "san": 26.9, "natural": 12.0, "total": 38.4},
-            4: {"label": "Seg 4 · Base / Dormant",      "color": "#BA7517", "san": 22.8, "natural": 21.1, "total": 43.5},
+            1: {"label": "Seg 1 · High Risk",          "color": "#E24B4A", "san": 25.5, "natural": 10.3, "total": 29.0},
+            2: {"label": "Seg 2 · High Value",          "color": "#378ADD", "san": 46.6, "natural":  2.8, "total": 21.1},
+            3: {"label": "Seg 3 · High Ext. Credit",    "color": "#1D9E75", "san": 21.4, "natural":  9.8, "total": 31.3},
+            4: {"label": "Seg 4 · Base / Dormant",      "color": "#BA7517", "san": 18.8, "natural": 19.2, "total": 38.1},
         }
 
         for cid, d in seg_data.items():
@@ -990,8 +1155,8 @@ elif page == "Clustering":
                 <div style='position:absolute;left:{d["san"]}%;width:{d["natural"]}%;height:100%;background:{c};opacity:.35'></div>
               </div>
               <div style='display:flex;gap:14px;font-size:11px;color:#718096;margin-top:4px'>
-                <span><b style='color:{c}'>■</b> Early SAN {d["san"]:.1f}%</span>
-                <span><b style='color:{c};opacity:.4'>■</b> Natural SOL {d["natural"]:.1f}%</span>
+                <span><b style='color:{c}'>■</b> Early churn {d["san"]:.1f}%</span>
+                <span><b style='color:{c};opacity:.4'>■</b> Natural churn {d["natural"]:.1f}%</span>
               </div>
             </div>""", unsafe_allow_html=True)
 
@@ -1000,11 +1165,12 @@ elif page == "Clustering":
         st.markdown("""
         <div style='font-size:12px;color:#718096;line-height:1.75'>
             <b style='color:#2D3748'>Step 1 — 3-perspective K-Means</b> (k=3 each, silhouette-validated)<br>
-            &nbsp;&nbsp;· <b>P1 Financial</b>: N_CONTRACTS, TOTAL_MTFINO, MENSALIDADE, MEDIAN_DURDEG<br>
-            &nbsp;&nbsp;· <b>P2 Risk</b>: MONTVENC_LOG, RISK_EVER, RISK_RECENT, COUNT_CL, DIVIDAS<br>
-            &nbsp;&nbsp;· <b>P3 History</b>: CLIENT_SENIORITY_YEARS, YEARS_SINCE_LAST_CONTRACT, N_Dossiers<br><br>
+            &nbsp;&nbsp;· <b>P1 Financial</b>: N_CONTRACTS, TOTAL_MTFINO, TOTAL_MENSALIDADE, MEDIAN_DURDEG<br>
+            &nbsp;&nbsp;· <b>P2 Risk</b>: MAX_RANGPRO, MAX_RANGCLI, MAX_RISKA, ALLBD_IDADE_MEAN__N, COUNT_CL_MEDIAN, COUNT_AUTO_MEDIAN, COUNT_TOTAL_MEDIAN, DIVIDAS_TOTAL_MEDIAN, MONTVENC_TOTAL_LOG, RISK_EVER, RISK_RECENT<br>
+            &nbsp;&nbsp;· <b>P3 History</b>: CLIENT_SENIORITY_YEARS, YEARS_SINCE_LAST_CONTRACT, ALLBD_N_Dossiers__N<br><br>
             <b style='color:#2D3748'>Step 2 — Ward hierarchical clustering</b> on combined P1_P2_P3 centroids<br>
-            &nbsp;&nbsp;→ Dendrogram cut at <b>n=4</b> (deeper cuts yield segments &lt;2% of base)
+            &nbsp;&nbsp;→ Dendrogram cut at <b>n=4</b> (deeper cuts yield segments &lt;2% of base)<br>
+            &nbsp;&nbsp;→ High-risk branch (P2 Cluster 0) structurally isolated from all others
         </div>""", unsafe_allow_html=True)
 
     st.markdown("</div>", unsafe_allow_html=True)
@@ -1017,38 +1183,293 @@ elif page == "Clustering":
 elif page == "Model Metrics":
     st.markdown("<div class='page-body'>", unsafe_allow_html=True)
     st.markdown("<div class='page-title'>Model Performance</div>", unsafe_allow_html=True)
-    st.markdown("<div class='page-desc'>Cross-validation and test set evaluation for both models.</div>", unsafe_allow_html=True)
+    st.markdown("<div class='page-desc'>HistGradientBoosting · 5-fold stratified CV · RandomizedSearchCV tuning (20 iterations) · test set = 20% holdout (n=13,239).</div>", unsafe_allow_html=True)
 
-    st.markdown("<div class='slabel'>Model 1 — Early settlement (SAN vs SOL)</div>", unsafe_allow_html=True)
+    # ── Model 1 — SAN ────────────────────────────────────────────────────
+    st.markdown("<div class='slabel'>Model 1 — Early Settlement (SAN vs SOL)</div>", unsafe_allow_html=True)
     st.markdown("""<div class="metrics-grid">
-        <div class="mc green"><div class="mc-label">ROC-AUC</div><div class="mc-value green">—</div><div class="mc-sub">CV mean</div></div>
-        <div class="mc blue"><div class="mc-label">F1-score</div><div class="mc-value blue">—</div><div class="mc-sub">CV mean</div></div>
-        <div class="mc"><div class="mc-label">Precision</div><div class="mc-value">—</div><div class="mc-sub">test set</div></div>
-        <div class="mc"><div class="mc-label">Recall</div><div class="mc-value">—</div><div class="mc-sub">test set</div></div>
+        <div class="mc green">
+            <div class="mc-label">ROC-AUC · Test</div>
+            <div class="mc-value green">0.9871</div>
+            <div class="mc-sub">CV tuned: 0.9858</div>
+        </div>
+        <div class="mc blue">
+            <div class="mc-label">F1-score · SAN</div>
+            <div class="mc-value blue">0.96</div>
+            <div class="mc-sub">weighted avg: 0.96</div>
+        </div>
+        <div class="mc green">
+            <div class="mc-label">Precision · SAN</div>
+            <div class="mc-value green">0.96</div>
+            <div class="mc-sub">test set</div>
+        </div>
+        <div class="mc green">
+            <div class="mc-label">Recall · SAN</div>
+            <div class="mc-value green">0.97</div>
+            <div class="mc-sub">test set</div>
+        </div>
     </div>""", unsafe_allow_html=True)
 
-    st.markdown("<div class='slabel' style='margin-top:1.25rem'>Model 2 — Churn prediction</div>", unsafe_allow_html=True)
+    # ── Model 2 — Churn ───────────────────────────────────────────────────
+    st.markdown("<div class='slabel' style='margin-top:1.25rem'>Model 2 — Churn Prediction (Churn vs Renewal)</div>", unsafe_allow_html=True)
     st.markdown("""<div class="metrics-grid">
-        <div class="mc green"><div class="mc-label">ROC-AUC</div><div class="mc-value green">—</div><div class="mc-sub">CV mean</div></div>
-        <div class="mc blue"><div class="mc-label">F1-score</div><div class="mc-value blue">—</div><div class="mc-sub">CV mean</div></div>
-        <div class="mc"><div class="mc-label">Precision</div><div class="mc-value">—</div><div class="mc-sub">test set</div></div>
-        <div class="mc"><div class="mc-label">Recall</div><div class="mc-value">—</div><div class="mc-sub">test set</div></div>
+        <div class="mc green">
+            <div class="mc-label">ROC-AUC · Test</div>
+            <div class="mc-value green">0.9836</div>
+            <div class="mc-sub">CV tuned: 0.9827</div>
+        </div>
+        <div class="mc blue">
+            <div class="mc-label">F1-score · Churn</div>
+            <div class="mc-value blue">0.97</div>
+            <div class="mc-sub">weighted avg: 0.96</div>
+        </div>
+        <div class="mc green">
+            <div class="mc-label">Precision · Churn</div>
+            <div class="mc-value green">1.00</div>
+            <div class="mc-sub">test set</div>
+        </div>
+        <div class="mc green">
+            <div class="mc-label">Recall · Churn</div>
+            <div class="mc-value green">0.94</div>
+            <div class="mc-sub">test set</div>
+        </div>
     </div>""", unsafe_allow_html=True)
 
     st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
 
+    # ── Classification reports side by side ───────────────────────────────
     col1, col2 = st.columns(2, gap="large")
+
     with col1:
-        st.markdown("<div class='slabel'>Confusion matrix — SAN/SOL model</div>", unsafe_allow_html=True)
-        st.markdown("""<div class='todo' style='height:240px;display:flex;flex-direction:column;
-                        align-items:center;justify-content:center'>
-            <div class='todo-t'>Confusion matrix goes here</div>
+        st.markdown("<div class='slabel'>Classification Report — SAN/SOL model</div>", unsafe_allow_html=True)
+        st.markdown("""
+        <div style='font-size:12px;background:#F8FAFB;border-radius:10px;padding:14px 16px;font-family:monospace;line-height:1.8'>
+            <div style='display:grid;grid-template-columns:1fr repeat(4,80px);gap:0;margin-bottom:4px'>
+                <span style='color:#718096;font-weight:700'></span>
+                <span style='color:#718096;font-weight:700;text-align:right'>Prec</span>
+                <span style='color:#718096;font-weight:700;text-align:right'>Recall</span>
+                <span style='color:#718096;font-weight:700;text-align:right'>F1</span>
+                <span style='color:#718096;font-weight:700;text-align:right'>Support</span>
+            </div>
+            <div style='height:1px;background:#E2E8F0;margin-bottom:6px'></div>
+            <div style='display:grid;grid-template-columns:1fr repeat(4,80px);gap:0'>
+                <span style='color:#1A2B22;font-weight:600'>SOL</span>
+                <span style='color:#1A2B22;text-align:right'>0.95</span>
+                <span style='color:#1A2B22;text-align:right'>0.93</span>
+                <span style='color:#1A2B22;text-align:right'>0.94</span>
+                <span style='color:#718096;text-align:right'>4,965</span>
+            </div>
+            <div style='display:grid;grid-template-columns:1fr repeat(4,80px);gap:0;margin-top:4px'>
+                <span style='color:#00915A;font-weight:600'>SAN</span>
+                <span style='color:#00915A;text-align:right'>0.96</span>
+                <span style='color:#00915A;text-align:right'>0.97</span>
+                <span style='color:#00915A;text-align:right'>0.96</span>
+                <span style='color:#718096;text-align:right'>8,274</span>
+            </div>
+            <div style='height:1px;background:#E2E8F0;margin:8px 0'></div>
+            <div style='display:grid;grid-template-columns:1fr repeat(4,80px);gap:0'>
+                <span style='color:#718096'>accuracy</span>
+                <span></span><span></span>
+                <span style='color:#1A2B22;font-weight:700;text-align:right'>0.96</span>
+                <span style='color:#718096;text-align:right'>13,239</span>
+            </div>
+            <div style='display:grid;grid-template-columns:1fr repeat(4,80px);gap:0;margin-top:2px'>
+                <span style='color:#718096'>macro avg</span>
+                <span style='color:#718096;text-align:right'>0.95</span>
+                <span style='color:#718096;text-align:right'>0.95</span>
+                <span style='color:#718096;text-align:right'>0.95</span>
+                <span style='color:#718096;text-align:right'>13,239</span>
+            </div>
+            <div style='display:grid;grid-template-columns:1fr repeat(4,80px);gap:0;margin-top:2px'>
+                <span style='color:#718096'>weighted avg</span>
+                <span style='color:#718096;text-align:right'>0.96</span>
+                <span style='color:#718096;text-align:right'>0.96</span>
+                <span style='color:#718096;text-align:right'>0.96</span>
+                <span style='color:#718096;text-align:right'>13,239</span>
+            </div>
         </div>""", unsafe_allow_html=True)
+
     with col2:
-        st.markdown("<div class='slabel'>Feature importance — top 15</div>", unsafe_allow_html=True)
-        st.markdown("""<div class='todo' style='height:240px;display:flex;flex-direction:column;
-                        align-items:center;justify-content:center'>
-            <div class='todo-t'>Feature importance chart goes here</div>
+        st.markdown("<div class='slabel'>Classification Report — Churn model</div>", unsafe_allow_html=True)
+        st.markdown("""
+        <div style='font-size:12px;background:#F8FAFB;border-radius:10px;padding:14px 16px;font-family:monospace;line-height:1.8'>
+            <div style='display:grid;grid-template-columns:1fr repeat(4,80px);gap:0;margin-bottom:4px'>
+                <span style='color:#718096;font-weight:700'></span>
+                <span style='color:#718096;font-weight:700;text-align:right'>Prec</span>
+                <span style='color:#718096;font-weight:700;text-align:right'>Recall</span>
+                <span style='color:#718096;font-weight:700;text-align:right'>F1</span>
+                <span style='color:#718096;font-weight:700;text-align:right'>Support</span>
+            </div>
+            <div style='height:1px;background:#E2E8F0;margin-bottom:6px'></div>
+            <div style='display:grid;grid-template-columns:1fr repeat(4,80px);gap:0'>
+                <span style='color:#1A2B22;font-weight:600'>Renewal</span>
+                <span style='color:#1A2B22;text-align:right'>0.86</span>
+                <span style='color:#1A2B22;text-align:right'>0.99</span>
+                <span style='color:#1A2B22;text-align:right'>0.92</span>
+                <span style='color:#718096;text-align:right'>3,541</span>
+            </div>
+            <div style='display:grid;grid-template-columns:1fr repeat(4,80px);gap:0;margin-top:4px'>
+                <span style='color:#C0392B;font-weight:600'>Churn</span>
+                <span style='color:#C0392B;text-align:right'>1.00</span>
+                <span style='color:#C0392B;text-align:right'>0.94</span>
+                <span style='color:#C0392B;text-align:right'>0.97</span>
+                <span style='color:#718096;text-align:right'>9,698</span>
+            </div>
+            <div style='height:1px;background:#E2E8F0;margin:8px 0'></div>
+            <div style='display:grid;grid-template-columns:1fr repeat(4,80px);gap:0'>
+                <span style='color:#718096'>accuracy</span>
+                <span></span><span></span>
+                <span style='color:#1A2B22;font-weight:700;text-align:right'>0.95</span>
+                <span style='color:#718096;text-align:right'>13,239</span>
+            </div>
+            <div style='display:grid;grid-template-columns:1fr repeat(4,80px);gap:0;margin-top:2px'>
+                <span style='color:#718096'>macro avg</span>
+                <span style='color:#718096;text-align:right'>0.93</span>
+                <span style='color:#718096;text-align:right'>0.97</span>
+                <span style='color:#718096;text-align:right'>0.94</span>
+                <span style='color:#718096;text-align:right'>13,239</span>
+            </div>
+            <div style='display:grid;grid-template-columns:1fr repeat(4,80px);gap:0;margin-top:2px'>
+                <span style='color:#718096'>weighted avg</span>
+                <span style='color:#718096;text-align:right'>0.96</span>
+                <span style='color:#718096;text-align:right'>0.95</span>
+                <span style='color:#718096;text-align:right'>0.96</span>
+                <span style='color:#718096;text-align:right'>13,239</span>
+            </div>
+        </div>""", unsafe_allow_html=True)
+
+    st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
+
+    # ── CV model comparison table ─────────────────────────────────────────
+    col3, col4 = st.columns(2, gap="large")
+
+    with col3:
+        st.markdown("<div class='slabel'>CV comparison — SAN/SOL model (5-fold)</div>", unsafe_allow_html=True)
+        st.markdown("""
+        <div style='font-size:12px;background:#F8FAFB;border-radius:10px;padding:14px 16px;line-height:1.9'>
+            <div style='display:grid;grid-template-columns:1.6fr repeat(3,1fr);margin-bottom:4px'>
+                <span style='color:#718096;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.06em'>Model</span>
+                <span style='color:#718096;font-weight:700;font-size:11px;text-align:right'>Train AUC</span>
+                <span style='color:#718096;font-weight:700;font-size:11px;text-align:right'>Val AUC</span>
+                <span style='color:#718096;font-weight:700;font-size:11px;text-align:right'>Gap</span>
+            </div>
+            <div style='height:1px;background:#E2E8F0;margin-bottom:6px'></div>
+            <div style='display:grid;grid-template-columns:1.6fr repeat(3,1fr);background:#E8F5EE;border-radius:6px;padding:3px 6px'>
+                <span style='color:#00915A;font-weight:700'>HistGBM ✓</span>
+                <span style='color:#1A2B22;text-align:right'>0.9916</span>
+                <span style='color:#00915A;font-weight:700;text-align:right'>0.9850</span>
+                <span style='color:#718096;text-align:right'>0.0066</span>
+            </div>
+            <div style='display:grid;grid-template-columns:1.6fr repeat(3,1fr);padding:3px 6px'>
+                <span style='color:#1A2B22'>Random Forest</span>
+                <span style='color:#1A2B22;text-align:right'>1.0000</span>
+                <span style='color:#1A2B22;text-align:right'>0.9812</span>
+                <span style='color:#C0392B;text-align:right'>0.0188</span>
+            </div>
+            <div style='display:grid;grid-template-columns:1.6fr repeat(3,1fr);padding:3px 6px'>
+                <span style='color:#1A2B22'>Logistic Reg.</span>
+                <span style='color:#1A2B22;text-align:right'>0.9279</span>
+                <span style='color:#1A2B22;text-align:right'>0.9270</span>
+                <span style='color:#718096;text-align:right'>0.0008</span>
+            </div>
+        </div>""", unsafe_allow_html=True)
+
+    with col4:
+        st.markdown("<div class='slabel'>CV comparison — Churn model (5-fold)</div>", unsafe_allow_html=True)
+        st.markdown("""
+        <div style='font-size:12px;background:#F8FAFB;border-radius:10px;padding:14px 16px;line-height:1.9'>
+            <div style='display:grid;grid-template-columns:1.6fr repeat(3,1fr);margin-bottom:4px'>
+                <span style='color:#718096;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.06em'>Model</span>
+                <span style='color:#718096;font-weight:700;font-size:11px;text-align:right'>Train AUC</span>
+                <span style='color:#718096;font-weight:700;font-size:11px;text-align:right'>Val AUC</span>
+                <span style='color:#718096;font-weight:700;font-size:11px;text-align:right'>Gap</span>
+            </div>
+            <div style='height:1px;background:#E2E8F0;margin-bottom:6px'></div>
+            <div style='display:grid;grid-template-columns:1.6fr repeat(3,1fr);background:#E8F5EE;border-radius:6px;padding:3px 6px'>
+                <span style='color:#00915A;font-weight:700'>HistGBM ✓</span>
+                <span style='color:#1A2B22;text-align:right'>0.9939</span>
+                <span style='color:#00915A;font-weight:700;text-align:right'>0.9821</span>
+                <span style='color:#718096;text-align:right'>0.0118</span>
+            </div>
+            <div style='display:grid;grid-template-columns:1.6fr repeat(3,1fr);padding:3px 6px'>
+                <span style='color:#1A2B22'>Random Forest</span>
+                <span style='color:#1A2B22;text-align:right'>1.0000</span>
+                <span style='color:#1A2B22;text-align:right'>0.9808</span>
+                <span style='color:#C0392B;text-align:right'>0.0192</span>
+            </div>
+            <div style='display:grid;grid-template-columns:1.6fr repeat(3,1fr);padding:3px 6px'>
+                <span style='color:#1A2B22'>Logistic Reg.</span>
+                <span style='color:#1A2B22;text-align:right'>0.9735</span>
+                <span style='color:#1A2B22;text-align:right'>0.9732</span>
+                <span style='color:#718096;text-align:right'>0.0003</span>
+            </div>
+        </div>""", unsafe_allow_html=True)
+
+    st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
+
+    # ── Churn feature importance (permutation) ────────────────────────────
+    st.markdown("<div class='slabel'>Feature importance — Churn model · top 10 (permutation-based)</div>", unsafe_allow_html=True)
+
+    churn_features = [
+        ("N_CONTRACTS",          0.4170, "#C0392B"),
+        ("ALLBD_A_CL__N",        0.0137, "#E24B4A"),
+        ("MIN_RANGPRO",          0.0078, "#E86B5F"),
+        ("ALLBD_N_Dossiers__N",  0.0027, "#F08080"),
+        ("MIN_RESSO",            0.0020, "#F4A29A"),
+        ("MAX_RANGPRO",          0.0012, "#F4A29A"),
+        ("MEDIAN_DURDEG",        0.0010, "#F4C4BE"),
+        ("DIVIDAS_CL_MEDIAN",    0.0008, "#F4C4BE"),
+        ("ALLBD_IDADE_MEAN__N",  0.0008, "#F4C4BE"),
+        ("PRODALP_EP",           0.0008, "#F4C4BE"),
+    ]
+
+    max_val = churn_features[0][1]
+    bar_html = "<div style='display:flex;flex-direction:column;gap:5px'>"
+    for feat, val, color in churn_features:
+        bar_pct = val / max_val * 100
+        bar_html += f"""
+        <div style='display:flex;align-items:center;gap:10px'>
+            <span style='font-size:12px;color:#2D3748;width:180px;text-align:right;flex-shrink:0'>{feat}</span>
+            <div style='flex:1;height:18px;background:#F5F7FA;border-radius:4px;overflow:hidden'>
+                <div style='width:{bar_pct:.1f}%;height:100%;background:{color};border-radius:4px'></div>
+            </div>
+            <span style='font-size:11px;color:#718096;width:54px;flex-shrink:0'>{val:.4f}</span>
+        </div>"""
+    bar_html += "</div>"
+    st.markdown(bar_html, unsafe_allow_html=True)
+
+    st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
+
+    # ── Tuned hyperparams ─────────────────────────────────────────────────
+    col5, col6 = st.columns(2, gap="large")
+    with col5:
+        st.markdown("<div class='slabel'>Best hyperparameters — SAN model</div>", unsafe_allow_html=True)
+        st.markdown("""
+        <div style='font-size:12px;color:#718096;background:#F8FAFB;border-radius:10px;padding:12px 16px;line-height:2'>
+            <span style='color:#2D3748;font-weight:600'>Algorithm</span>: HistGradientBoostingClassifier · No SMOTE<br>
+            <span style='color:#2D3748;font-weight:600'>learning_rate</span>: 0.1 &nbsp;·&nbsp;
+            <span style='color:#2D3748;font-weight:600'>max_iter</span>: 200 &nbsp;·&nbsp;
+            <span style='color:#2D3748;font-weight:600'>max_depth</span>: 7<br>
+            <span style='color:#2D3748;font-weight:600'>min_samples_leaf</span>: 30 &nbsp;·&nbsp;
+            <span style='color:#2D3748;font-weight:600'>l2_reg</span>: 1.0<br>
+            <span style='color:#2D3748;font-weight:600'>corr_threshold</span>: 0.85 &nbsp;·&nbsp;
+            <span style='color:#2D3748;font-weight:600'>lasso_C</span>: 0.01 &nbsp;·&nbsp;
+            <span style='color:#2D3748;font-weight:600'>rfe_fraction</span>: 0.5
+        </div>""", unsafe_allow_html=True)
+
+    with col6:
+        st.markdown("<div class='slabel'>Best hyperparameters — Churn model</div>", unsafe_allow_html=True)
+        st.markdown("""
+        <div style='font-size:12px;color:#718096;background:#F8FAFB;border-radius:10px;padding:12px 16px;line-height:2'>
+            <span style='color:#2D3748;font-weight:600'>Algorithm</span>: HistGradientBoostingClassifier · No SMOTE<br>
+            <span style='color:#2D3748;font-weight:600'>learning_rate</span>: 0.03 &nbsp;·&nbsp;
+            <span style='color:#2D3748;font-weight:600'>max_iter</span>: 300 &nbsp;·&nbsp;
+            <span style='color:#2D3748;font-weight:600'>max_depth</span>: None<br>
+            <span style='color:#2D3748;font-weight:600'>min_samples_leaf</span>: 10 &nbsp;·&nbsp;
+            <span style='color:#2D3748;font-weight:600'>l2_reg</span>: 0.0<br>
+            <span style='color:#2D3748;font-weight:600'>corr_threshold</span>: 0.95 &nbsp;·&nbsp;
+            <span style='color:#2D3748;font-weight:600'>lasso_C</span>: 0.1 &nbsp;·&nbsp;
+            <span style='color:#2D3748;font-weight:600'>rfe_fraction</span>: 0.6
         </div>""", unsafe_allow_html=True)
 
     st.markdown("</div>", unsafe_allow_html=True)
