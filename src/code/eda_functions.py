@@ -445,12 +445,18 @@ def san_4_risk(df):
     _fmt_pct(ax)
     ax.set_title("Early Settlement Rate by MAX_RISKA", fontsize=9)
 
-    # ── 2. Last risk code ─────────────────────────────────────
+ # ── 2. Delinquency history (derived from LAST_RISK) ──────────
     ax = axes[0, 1]
     tmp = df.copy()
-    tmp["last_risk"] = tmp["LAST_RISK"].astype(str).str[-1]
-    _rate_bar(ax, tmp["last_risk"], df[T],
-              "Early Settlement Rate by Last Risk Code")
+    tmp["RISK_N_BAD"] = tmp["LAST_RISK"].astype(str).apply(
+        lambda x: sum(1 for c in x if c.isdigit() and c != '0'))
+    _kde(ax, tmp.loc[tmp[T] == 0, "RISK_N_BAD"], C_NO, "Settler=0")
+    _kde(ax, tmp.loc[tmp[T] == 1, "RISK_N_BAD"], COL,  "Settler=1")
+    ax.legend(fontsize=8)
+    ax.set_yticks([])
+    ax.set_xlabel("N months with delinquency (from LAST_RISK)")
+    ax.set_title("Delinquency History\n"
+                 "→ Do early settlers have cleaner payment records?", fontsize=9)
 
     # ── 3. MEDIAN_RANGCLI ─────────────────────────────────────
     ax = axes[1, 0]
@@ -865,12 +871,18 @@ def churn_4_risk(df):
     plt.setp(ax.get_xticklabels(), rotation=30, ha="right", fontsize=8)
     ax.set_title("Churn Rate by MAX_RISKA", fontsize=9)
 
-    # ── 2. Last risk code ─────────────────────────────────────
+    # ── 2. Delinquency history (derived from LAST_RISK) ──────────
     ax = axes[0, 1]
     tmp = df.copy()
-    tmp["last_risk"] = tmp["LAST_RISK"].astype(str).str[-1]
-    _rate_bar(ax, tmp["last_risk"], df[T],
-              "Churn Rate by Last Risk Code", highlight_color=C_CHR)
+    tmp["RISK_N_BAD"] = tmp["LAST_RISK"].astype(str).apply(
+        lambda x: sum(1 for c in x if c.isdigit() and c != '0'))
+    _kde(ax, tmp.loc[tmp[T] == 0, "RISK_N_BAD"], C_NO, "Churn=0")
+    _kde(ax, tmp.loc[tmp[T] == 1, "RISK_N_BAD"], COL,  "Churn=1")
+    ax.legend(fontsize=8)
+    ax.set_yticks([])
+    ax.set_xlabel("N months with delinquency (from LAST_RISK)")
+    ax.set_title("Delinquency History\n"
+                 "→ Do churners have more delinquency history?", fontsize=9)
 
     # ── 3. MEDIAN_RANGCLI ─────────────────────────────────────
     ax = axes[1, 0]
