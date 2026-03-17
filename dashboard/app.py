@@ -688,6 +688,52 @@ if page == "Portfolio Overview":
           <tbody>{rows_html}</tbody>
         </table>""", unsafe_allow_html=True)
 
+    # ── Survival Analysis Panel ───────────────────────────────────────────
+    st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
+    st.markdown("<div class='slabel'>Survival analysis · Kaplan-Meier insights (n=67,440 settled clients)</div>", unsafe_allow_html=True)
+
+    sv1, sv2, sv3, sv4 = st.columns(4, gap="medium")
+    with sv1:
+        st.markdown("""<div class='mc' style='border-left-color:#00915A'>
+            <div class='mc-label'>Median time-to-churn</div>
+            <div class='mc-value green'>42 mo.</div>
+            <div class='mc-sub'>~1,280 days from contract start</div>
+        </div>""", unsafe_allow_html=True)
+    with sv2:
+        st.markdown("""<div class='mc' style='border-left-color:#378ADD'>
+            <div class='mc-label'>Retention at 1 year</div>
+            <div class='mc-value' style='color:#378ADD'>87.2%</div>
+            <div class='mc-sub'>72% at 2 yrs · 46% at 4 yrs</div>
+        </div>""", unsafe_allow_html=True)
+    with sv3:
+        st.markdown("""<div class='mc' style='border-left-color:#C0392B'>
+            <div class='mc-label'>Early settlers churn faster</div>
+            <div class='mc-value red'>2.2×</div>
+            <div class='mc-sub'>874 days vs 1,959 days (SOL)</div>
+        </div>""", unsafe_allow_html=True)
+    with sv4:
+        st.markdown("""<div class='mc' style='border-left-color:#BA7517'>
+            <div class='mc-label'>Cox C-index</div>
+            <div class='mc-value amber'>0.837</div>
+            <div class='mc-sub'>Good discrimination of churn risk</div>
+        </div>""", unsafe_allow_html=True)
+
+    # Retention timeline bar
+    retention = [(90, 97.8), (180, 94.8), (365, 87.2), (730, 71.8), (1460, 45.8), (2920, 10.9)]
+    timeline_html = "<div style='display:flex;align-items:flex-end;gap:10px;margin-top:14px;height:80px'>"
+    for days, pct in retention:
+        label = f"{days//30}mo" if days < 365 else f"{days//365}yr{'s' if days//365>1 else ''}"
+        bar_h = int(pct * 0.65)
+        color = "#00915A" if pct >= 80 else "#BA7517" if pct >= 50 else "#C0392B"
+        timeline_html += f"""
+        <div style='display:flex;flex-direction:column;align-items:center;flex:1'>
+            <span style='font-size:11px;font-weight:700;color:{color};margin-bottom:3px'>{pct:.0f}%</span>
+            <div style='width:100%;height:{bar_h}px;background:{color};opacity:.8;border-radius:4px 4px 0 0'></div>
+            <span style='font-size:10px;color:#A0AEC0;margin-top:4px'>{label}</span>
+        </div>"""
+    timeline_html += "</div><div style='font-size:11px;color:#A0AEC0;margin-top:4px'>Retention probability at each timepoint — churn is a slow-burn: no steep early drop, steady decline after year 1.</div>"
+    st.markdown(timeline_html, unsafe_allow_html=True)
+
     st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -1407,36 +1453,107 @@ elif page == "Model Metrics":
 
     st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
 
-    # ── Churn feature importance (permutation) ────────────────────────────
-    st.markdown("<div class='slabel'>Feature importance — Churn model · top 10 (permutation-based)</div>", unsafe_allow_html=True)
+    # ── Cox PH Hazard Ratios ───────────────────────────────────────────────
+    st.markdown("<div class='slabel'>Survival analysis · Cox Proportional Hazards — churn drivers (C-index = 0.837 · n=67,440)</div>", unsafe_allow_html=True)
 
-    churn_features = [
-        ("N_CONTRACTS",          0.4170, "#C0392B"),
-        ("ALLBD_A_CL__N",        0.0137, "#E24B4A"),
-        ("MIN_RANGPRO",          0.0078, "#E86B5F"),
-        ("ALLBD_N_Dossiers__N",  0.0027, "#F08080"),
-        ("MIN_RESSO",            0.0020, "#F4A29A"),
-        ("MAX_RANGPRO",          0.0012, "#F4A29A"),
-        ("MEDIAN_DURDEG",        0.0010, "#F4C4BE"),
-        ("DIVIDAS_CL_MEDIAN",    0.0008, "#F4C4BE"),
-        ("ALLBD_IDADE_MEAN__N",  0.0008, "#F4C4BE"),
-        ("PRODALP_EP",           0.0008, "#F4C4BE"),
+    # KM summary strip
+    st.markdown("""
+    <div style='display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap'>
+        <div style='background:#F0FBF7;border:1px solid #D1FAE5;border-radius:8px;padding:8px 14px;font-size:12px'>
+            <span style='color:#718096'>Median survival</span>
+            <span style='color:#00915A;font-weight:700;margin-left:8px'>42 months</span>
+        </div>
+        <div style='background:#FEF9C3;border:1px solid #FDE68A;border-radius:8px;padding:8px 14px;font-size:12px'>
+            <span style='color:#718096'>Early settlers churn</span>
+            <span style='color:#92400E;font-weight:700;margin-left:8px'>2.2× faster</span>
+            <span style='color:#718096;margin-left:4px'>874 vs 1,959 days median · log-rank p≈0</span>
+        </div>
+        <div style='background:#F8FAFB;border:1px solid #E2E8F0;border-radius:8px;padding:8px 14px;font-size:12px'>
+            <span style='color:#718096'>HR &gt; 1 = higher churn hazard · HR &lt; 1 = protective</span>
+        </div>
+    </div>""", unsafe_allow_html=True)
+
+    cox_col1, cox_col2 = st.columns(2, gap="large")
+
+    # Risk drivers — HR > 1, p < 0.05, excluding _Unknown artifacts
+    risk_drivers = [
+        ("CSP_58 (unlabeled)",       2.008, "p<0.001"),
+        ("CSP_50 (unlabeled)",       1.880, "p<0.001"),
+        ("CSP_54 (unlabeled)",       1.799, "p<0.001"),
+        ("CSP_53 (unlabeled)",       1.764, "p<0.001"),
+        ("CSP_57 (unlabeled)",       1.764, "p<0.001"),
+        ("CSP_56 (Other)",           1.722, "p<0.001"),
+        ("CSP_52 (unlabeled)",       1.640, "p<0.001"),
+        ("CSP_55 (unlabeled)",       1.586, "p<0.001"),
+        ("CSP_35 · Teachers",        1.357, "p<0.001"),
+        ("ALLBD_A_CP__N",            1.290, "p<0.001"),
+        ("sdem_SITFAM_P",            1.297, "p<0.001"),
+        ("CSP_32 · Health Prof.",    1.229, "p<0.001"),
+        ("PRODALP_DEF",              1.241, "p<0.001"),
+        ("PRODALP_EXT",              1.213, "p<0.001"),
+        ("sdem_HABITAT_A · Prop.loan", 1.155, "p<0.001"),
     ]
 
-    max_val = churn_features[0][1]
-    bar_html = "<div style='display:flex;flex-direction:column;gap:5px'>"
-    for feat, val, color in churn_features:
-        bar_pct = val / max_val * 100
-        bar_html += f"""
-        <div style='display:flex;align-items:center;gap:10px'>
-            <span style='font-size:12px;color:#2D3748;width:180px;text-align:right;flex-shrink:0'>{feat}</span>
-            <div style='flex:1;height:18px;background:#F5F7FA;border-radius:4px;overflow:hidden'>
-                <div style='width:{bar_pct:.1f}%;height:100%;background:{color};border-radius:4px'></div>
+    # Protective factors — HR < 1, p < 0.05, excluding artifacts
+    protect_drivers = [
+        ("CSP_96 · Fixed-term workers", 0.433, "p<0.001"),
+        ("CSP_81 · Driver-Security",    0.466, "p<0.001"),
+        ("CSP_10 · Merchants",          0.537, "p<0.001"),
+        ("sdem_HABITAT_O · Other",      0.630, "p<0.001"),
+        ("sdem_HABITAT_E · Employer",   0.684, "p=0.002"),
+        ("CSP_92 · Unemployed",         0.752, "p<0.001"),
+        ("CSP_15 · Service providers",  0.756, "p<0.001"),
+        ("CSP_20 · Managing partners",  0.761, "p<0.001"),
+        ("CSP_41 · Public dept heads",  0.841, "p<0.001"),
+        ("PRODALP_EPF",                 0.864, "p<0.001"),
+        ("sdem_SITFAM_S · Single",      0.905, "p<0.001"),
+        ("sdem_HABITAT_L · Tenant",     0.913, "p<0.001"),
+    ]
+
+    def cox_bar(label, hr, sig, is_risk):
+        color = "#C0392B" if is_risk else "#00915A"
+        bg    = "#FEE2E2" if is_risk else "#D1FAE5"
+        # bar width: risk drivers stretch right from 1, protective stretch left
+        # normalise: risk max ~2.0 → 100%, protective min ~0.43 → 100%
+        if is_risk:
+            bar_pct = min((hr - 1) / 1.1 * 100, 100)
+        else:
+            bar_pct = min((1 - hr) / 0.6 * 100, 100)
+        return f"""
+        <div style='display:flex;align-items:center;gap:8px;margin-bottom:7px'>
+            <span style='font-size:11px;color:#2D3748;width:200px;flex-shrink:0;text-align:right'>{label}</span>
+            <div style='width:120px;background:#F5F7FA;border-radius:3px;overflow:hidden;height:14px;flex-shrink:0'>
+                <div style='width:{bar_pct:.0f}%;height:100%;background:{color};opacity:.8'></div>
             </div>
-            <span style='font-size:11px;color:#718096;width:54px;flex-shrink:0'>{val:.4f}</span>
+            <span style='font-size:12px;font-weight:700;color:{color};width:40px;flex-shrink:0'>×{hr:.2f}</span>
+            <span style='font-size:10px;color:#A0AEC0'>{sig}</span>
         </div>"""
-    bar_html += "</div>"
-    st.markdown(bar_html, unsafe_allow_html=True)
+
+    with cox_col1:
+        st.markdown("""<div style='font-size:11px;font-weight:700;color:#C0392B;text-transform:uppercase;
+                        letter-spacing:.07em;margin-bottom:10px;display:flex;align-items:center;gap:6px'>
+            <span style='width:10px;height:10px;background:#C0392B;border-radius:2px;display:inline-block'></span>
+            Churn risk drivers (HR &gt; 1)
+        </div>""", unsafe_allow_html=True)
+        bars = "".join(cox_bar(l, h, s, True) for l, h, s in risk_drivers)
+        st.markdown(f"<div style='background:#F8FAFB;border-radius:10px;padding:14px 10px'>{bars}</div>",
+                    unsafe_allow_html=True)
+
+    with cox_col2:
+        st.markdown("""<div style='font-size:11px;font-weight:700;color:#00915A;text-transform:uppercase;
+                        letter-spacing:.07em;margin-bottom:10px;display:flex;align-items:center;gap:6px'>
+            <span style='width:10px;height:10px;background:#00915A;border-radius:2px;display:inline-block'></span>
+            Protective factors (HR &lt; 1)
+        </div>""", unsafe_allow_html=True)
+        bars = "".join(cox_bar(l, h, s, False) for l, h, s in protect_drivers)
+        st.markdown(f"<div style='background:#F8FAFB;border-radius:10px;padding:14px 10px'>{bars}</div>",
+                    unsafe_allow_html=True)
+
+    st.markdown("""<div style='font-size:11px;color:#A0AEC0;margin-top:8px;line-height:1.6'>
+        ⚠️ CSP codes 50–58 dominate risk but are unlabeled in the available data dictionary — cannot be fully interpreted without the internal catalogue.
+        Artifacts (<code>_Unknown</code> dummies from imputation, HR≈0.33) excluded.
+        Cox PH fitted with L2 penalizer=0.1 on 90 features.
+    </div>""", unsafe_allow_html=True)
 
     st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
 
